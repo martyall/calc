@@ -19,9 +19,19 @@ FactorOp: Opcode = {
 };
 
 Factor: Box<Expr> = {
-    Factor FactorOp Term => Box::new(Expr::BinOp(<>)),
+    Factor FactorOp Pow => Box::new(Expr::BinOp(<>)),
+    Pow,
+};
+
+PowOp: Opcode = {
+    "^" => Opcode::Pow,
+};
+
+Pow: Box<Expr> = {
+    Pow PowOp Term => Box::new(Expr::BinOp(<>)),
     Term,
 };
+
 
 Term: Box<Expr> = {
     Num => Box::new(Expr::Number(<>)), // (4)

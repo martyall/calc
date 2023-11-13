@@ -2,7 +2,6 @@
 pub enum Op {
     Add,
     Sub,
-    Mul,
 }
 
 #[derive(Debug, PartialEq)]

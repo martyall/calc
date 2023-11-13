@@ -104,11 +104,7 @@ mod parens_tests {
 fn op(input: &str) -> IResult<&str, Op> {
     delimited(
         space0,
-        alt((
-            map(tag("+"), |_| Op::Add),
-            map(tag("-"), |_| Op::Sub),
-            map(tag("*"), |_| Op::Mul),
-        )),
+        alt((map(tag("+"), |_| Op::Add), map(tag("-"), |_| Op::Sub))),
         space0,
     )(input)
 }
@@ -121,7 +117,6 @@ mod op_tests {
     fn test_op() {
         assert_eq!(op("+"), Ok(("", Op::Add)));
         assert_eq!(op("-"), Ok(("", Op::Sub)));
-        assert_eq!(op("*"), Ok(("", Op::Mul)));
     }
 }
 
@@ -173,7 +168,7 @@ fn simple_ast(input: &str) -> IResult<&str, AST> {
 }
 
 pub fn ast(input: &str) -> IResult<&str, AST> {
-    alt((parens(ast), binop(simple_ast), negate(ast), literal))(input)
+    alt((binop(simple_ast), parens(ast), negate(ast), literal))(input)
 }
 
 #[cfg(test)]
@@ -200,6 +195,29 @@ mod ast_tests {
                     Op::Add,
                     Box::new(Negate(Box::new(Literal(1)))),
                     Box::new(Negate(Box::new(Literal(2))))
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn test_expr2() {
+        assert_eq!(
+            ast("1 + ((-1 + -2) - 3)"),
+            Ok((
+                "",
+                BinOp(
+                    Op::Add,
+                    Box::new(Literal(1)),
+                    Box::new(BinOp(
+                        Op::Sub,
+                        Box::new(BinOp(
+                            Op::Add,
+                            Box::new(Negate(Box::new(Literal(1)))),
+                            Box::new(Negate(Box::new(Literal(2))))
+                        )),
+                        Box::new(Literal(3))
+                    ))
                 )
             ))
         );

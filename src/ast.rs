@@ -1,4 +1,6 @@
-#[derive(Debug, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Opcode {
     Add,
     Sub,
@@ -7,7 +9,7 @@ pub enum Opcode {
     Pow,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Expr {
     Number(i32),
     BinOp(Box<Expr>, Opcode, Box<Expr>),

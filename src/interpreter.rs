@@ -1,6 +1,6 @@
 use crate::ast::{Expr, Opcode};
 
-fn interpret(expr: &Expr) -> i32 {
+pub fn interpret(expr: &Expr) -> i32 {
     match expr {
         Expr::Number(n) => n.clone(),
         Expr::BinOp(lhs, op, rhs) => {

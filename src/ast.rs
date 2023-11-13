@@ -1,12 +1,16 @@
-#[derive(Debug, PartialEq)]
-pub enum Op {
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Opcode {
     Add,
     Sub,
+    Mul,
+    Div,
+    Pow,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum AST {
-    Literal(u32),
-    Negate(Box<AST>),
-    BinOp(Op, Box<AST>, Box<AST>),
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Expr {
+    Number(i32),
+    BinOp(Box<Expr>, Opcode, Box<Expr>),
 }

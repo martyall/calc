@@ -1,12 +1,13 @@
 #[derive(Debug, PartialEq)]
-pub enum Op {
+pub enum Opcode {
     Add,
     Sub,
+    Mul,
+    Div,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum AST {
-    Literal(u32),
-    Negate(Box<AST>),
-    BinOp(Op, Box<AST>, Box<AST>),
+pub enum Expr {
+    Number(i32),
+    BinOp(Box<Expr>, Opcode, Box<Expr>),
 }

@@ -1,0 +1,18 @@
+integer = @{ ASCII_DIGIT+ }
+
+unary_minus = { "-" }
+primary = _{ integer | "(" ~ expr ~ ")" }
+atom = _{ unary_minus? ~ primary }
+
+bin_op = _{ add | sub | mul | div | pow }
+    add = { "+" }
+    sub = { "-" }
+    mul = { "*" }
+    div = { "/" }
+    pow = { "^" }
+
+expr = { atom ~ (bin_op ~ atom)* }
+
+WHITESPACE = _{ " " | "\n" }
+
+equation = _{ SOI ~ expr ~ EOI }

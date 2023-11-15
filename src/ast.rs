@@ -5,7 +5,6 @@ pub enum Opcode {
     Add,
     Sub,
     Mul,
-    Div,
     Pow,
 }
 
@@ -17,6 +16,12 @@ pub enum UOpcode {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Expr {
     Number(i32),
+    Variable(String),
     UnaryOp(UOpcode, Box<Expr>),
     BinOp(Box<Expr>, Opcode, Box<Expr>),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Statement {
+    VarAssignment(String, Expr),
 }

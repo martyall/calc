@@ -1,18 +1,25 @@
 integer = @{ ASCII_DIGIT+ }
 
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+primary = _{ integer | identifier | "(" ~ expression ~ ")" }
+
 unary_minus = { "-" }
-primary = _{ integer | "(" ~ expr ~ ")" }
+
 atom = _{ unary_minus? ~ primary }
 
-bin_op = _{ add | sub | mul | div | pow }
+bin_op = _{ add | sub | mul | pow }
     add = { "+" }
     sub = { "-" }
     mul = { "*" }
-    div = { "/" }
     pow = { "^" }
 
-expr = { atom ~ (bin_op ~ atom)* }
+expression = { atom ~ (bin_op ~ atom)* }
 
-WHITESPACE = _{ " " | "\n" }
+NEWLINE = _{ "\r\n" | "\n" }
+WHITESPACE = _{ " " | "\t" | NEWLINE }
 
-equation = _{ SOI ~ expr ~ EOI }
+assignment = { "let" ~ identifier ~ "=" ~ expression ~ ";"}
+statement = _{ assignment }
+
+program = _{ SOI ~ statement* ~ EOI }

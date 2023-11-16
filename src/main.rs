@@ -3,7 +3,6 @@ pub mod interpreter;
 pub mod parser;
 
 use clap::Parser;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 

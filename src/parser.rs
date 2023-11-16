@@ -62,8 +62,12 @@ fn parse_declaration(pairs: Pair<Rule>) -> Declaration {
     match pairs.as_rule() {
         Rule::assignment => {
             let mut pairs = pairs.into_inner();
-            let name = pairs.next().unwrap().as_str().to_string();
-            let expr = parse_expr(pairs.next().unwrap().into_inner());
+            let name = pairs
+                .next()
+                .expect("Expected identifier")
+                .as_str()
+                .to_string();
+            let expr = parse_expr(pairs.next().expect("Expected expression").into_inner());
             Declaration::VarAssignment(name, expr)
         }
         rule => unreachable!("Declaration::parse expected assignment, found {:?}", rule),
@@ -72,7 +76,6 @@ fn parse_declaration(pairs: Pair<Rule>) -> Declaration {
 
 pub fn parse(input: &str) -> Result<Program, Error<Rule>> {
     let mut pairs = CalcParser::parse(Rule::program, input)?;
-    println!("{:?}", pairs);
     let mut declarations = Vec::new();
     while let Some(pair) = pairs.peek() {
         if pair.as_rule() == Rule::assignment {
@@ -83,7 +86,6 @@ pub fn parse(input: &str) -> Result<Program, Error<Rule>> {
         }
     }
     let pair = pairs.next().unwrap();
-    println!("{:?}", pair);
     if pair.as_rule() == Rule::expression {
         let expr = parse_expr(pair.into_inner());
         return Ok(Program {

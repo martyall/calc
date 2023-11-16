@@ -9,7 +9,7 @@
 
 ## Language Spec
 
-Calc programs are of the form
+The programs are simple. See the `examples` dir for examples. Calc programs are of the form
 
 ```
 let <ident_1> = <expr_1>;
@@ -28,4 +28,4 @@ where
 - `<expr>` is any arithmetic expression* over numbers of type `i32` and any declared variables.
 
 
-[`*`] arithmetic expressions can use parentheses, unary negation, and binary operators `+,-,*` and `^` (exponentiation)
+`*` arithmetic expressions can use parentheses, unary negation, and binary operators `+,-,*` and `^` (exponentiation)

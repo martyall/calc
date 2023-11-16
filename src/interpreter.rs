@@ -31,8 +31,11 @@ pub fn interpret_expr(context: &HashMap<String, Expr>, expr: &Expr) -> i32 {
     }
 }
 
-pub fn interpret(program: &Program) -> i32 {
-    let mut context = HashMap::new();
+pub fn interpret(initial_context: &HashMap<String, i32>, program: &Program) -> i32 {
+    let mut context = initial_context
+        .iter()
+        .map(|(k, v)| (k.clone(), Expr::Number(v.clone())))
+        .collect::<HashMap<String, Expr>>();
     for decl in &program.decls {
         match decl {
             Declaration::VarAssignment(name, expr) => {

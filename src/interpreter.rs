@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Expr, Opcode, Statement, UOpcode};
+use crate::ast::{Declaration, Expr, Opcode, Program, UOpcode};
 
 pub fn interpret_expr(context: &HashMap<String, Expr>, expr: &Expr) -> i32 {
     match expr {
@@ -31,13 +31,17 @@ pub fn interpret_expr(context: &HashMap<String, Expr>, expr: &Expr) -> i32 {
     }
 }
 
-pub fn interpret(context: &mut HashMap<String, Expr>, statement: &Statement) {
-    match statement {
-        Statement::VarAssignment(name, expr) => {
-            let value = interpret_expr(context, expr);
-            context.insert(name.clone(), Expr::Number(value));
+pub fn interpret(program: &Program) -> i32 {
+    let mut context = HashMap::new();
+    for decl in &program.decls {
+        match decl {
+            Declaration::VarAssignment(name, expr) => {
+                context.insert(name.clone(), expr.clone());
+            }
         }
     }
+    let expr = program.expr.inline(&mut context);
+    interpret_expr(&context, &expr)
 }
 
 #[cfg(test)]

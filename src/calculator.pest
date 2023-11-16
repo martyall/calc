@@ -16,10 +16,9 @@ bin_op = _{ add | sub | mul | pow }
 
 expression = { atom ~ (bin_op ~ atom)* }
 
+assignment = { "let" ~ identifier ~ "=" ~ expression ~ ";"}
+
+program = _{ SOI ~ assignment* ~ expression ~ EOI }
+
 NEWLINE = _{ "\r\n" | "\n" }
 WHITESPACE = _{ " " | "\t" | NEWLINE }
-
-assignment = { "let" ~ identifier ~ "=" ~ expression ~ ";"}
-statement = _{ assignment }
-
-program = _{ SOI ~ statement* ~ EOI }

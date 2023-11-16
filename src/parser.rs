@@ -78,7 +78,12 @@ pub fn parse(input: &str) -> Result<Program, Error<Rule>> {
     let mut pairs = CalcParser::parse(Rule::program, input)?;
     let mut declarations = Vec::new();
     while let Some(pair) = pairs.peek() {
-        if pair.as_rule() == Rule::assignment {
+        if pair.as_rule() == Rule::public_var {
+            declarations.push(Declaration::PublicVar(
+                pair.into_inner().next().unwrap().as_str().to_string(),
+            ));
+            pairs.next();
+        } else if pair.as_rule() == Rule::assignment {
             declarations.push(parse_declaration(pair));
             pairs.next();
         } else {

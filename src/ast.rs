@@ -39,7 +39,7 @@ impl Expr {
             Expr::Variable(name) => {
                 let expr = match context.get(name) {
                     Some(expr) => expr.clone(),
-                    None => panic!("Variable {} not found in context", name),
+                    None => Expr::Variable(name.clone()),
                 };
                 let expr = expr.inline(context);
                 context.insert(name.clone(), expr.clone());
@@ -52,6 +52,7 @@ impl Expr {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Declaration {
     VarAssignment(String, Expr),
+    PublicVar(String),
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]

@@ -41,6 +41,9 @@ pub fn interpret(initial_context: &HashMap<String, i32>, program: &Program) -> i
             Declaration::VarAssignment(name, expr) => {
                 context.insert(name.clone(), expr.clone());
             }
+            Declaration::PublicVar(name) => {
+                context.insert(name.clone(), Expr::Variable(name.clone()));
+            }
         }
     }
     let expr = program.expr.inline(&mut context);

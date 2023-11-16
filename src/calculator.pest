@@ -16,9 +16,11 @@ bin_op = _{ add | sub | mul | pow }
 
 expression = { atom ~ (bin_op ~ atom)* }
 
+public_var = { "pub" ~ identifier ~ ";" }
+
 assignment = { "let" ~ identifier ~ "=" ~ expression ~ ";"}
 
-program = _{ SOI ~ assignment* ~ expression ~ EOI }
+program = _{ SOI ~ public_var* ~ assignment* ~ expression ~ EOI }
 
 NEWLINE = _{ "\r\n" | "\n" }
 WHITESPACE = _{ " " | "\t" | NEWLINE }

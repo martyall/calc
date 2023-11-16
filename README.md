@@ -1,11 +1,16 @@
 ## Quickstart
 
+Run a program
 ```
 > cargo build
 > cargo run -- --input-file examples/simple_add.calc
 
 ```
 
+Inspect the AST in json format:
+```
+> cargo run -- --input-file examples/simple_add.calc --serialize
+```
 
 ## Language Spec
 

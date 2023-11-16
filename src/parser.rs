@@ -58,7 +58,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         .parse(pairs)
 }
 
-fn parse_declaration(pairs: Pair<Rule>) -> Declaration {
+fn parse_assignment(pairs: Pair<Rule>) -> Declaration {
     match pairs.as_rule() {
         Rule::assignment => {
             let mut pairs = pairs.into_inner();
@@ -74,33 +74,39 @@ fn parse_declaration(pairs: Pair<Rule>) -> Declaration {
     }
 }
 
-pub fn parse(input: &str) -> Result<Program, Error<Rule>> {
-    let mut pairs = CalcParser::parse(Rule::program, input)?;
+fn parse_public_var(pairs: Pair<Rule>) -> Declaration {
+    match pairs.as_rule() {
+        Rule::public_var => {
+            let name = pairs.into_inner().as_str().to_string();
+            Declaration::PublicVar(name)
+        }
+        rule => unreachable!("Declaration::parse expected public var, found {:?}", rule),
+    }
+}
+
+fn parse_decls(pairs: &mut Pairs<Rule>) -> Vec<Declaration> {
     let mut declarations = Vec::new();
     while let Some(pair) = pairs.peek() {
-        if pair.as_rule() == Rule::public_var {
-            declarations.push(Declaration::PublicVar(
-                pair.into_inner().next().unwrap().as_str().to_string(),
-            ));
-            pairs.next();
-        } else if pair.as_rule() == Rule::assignment {
-            declarations.push(parse_declaration(pair));
-            pairs.next();
-        } else {
-            break;
+        match pair.as_rule() {
+            Rule::public_var => {
+                declarations.push(parse_public_var(pair));
+                pairs.next();
+            }
+            Rule::assignment => {
+                declarations.push(parse_assignment(pair));
+                pairs.next();
+            }
+            _ => break,
         }
     }
-    let pair = pairs.next().unwrap();
-    if pair.as_rule() == Rule::expression {
-        let expr = parse_expr(pair.into_inner());
-        return Ok(Program {
-            decls: declarations,
-            expr,
-        });
-    } else {
-        unreachable!(
-            "parse expected declaration or expression, found {:?}",
-            pair.as_rule()
-        );
-    }
+    declarations
+}
+
+pub fn parse(input: &str) -> Result<Program, Error<Rule>> {
+    let mut pairs = CalcParser::parse(Rule::program, input)?;
+    let decls_pair = pairs.next().unwrap();
+    let decls = parse_decls(&mut decls_pair.into_inner());
+    let expr_pair = pairs.next().unwrap();
+    let expr = parse_expr(expr_pair.into_inner());
+    Ok(Program { decls, expr })
 }

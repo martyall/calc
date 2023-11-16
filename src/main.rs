@@ -41,7 +41,7 @@ fn main() {
             None => HashMap::new(),
             Some(ref file_path) => read_context(&file_path).unwrap_or(HashMap::new()),
         };
-        let res = interpreter::interpret(&initial_context, &program);
+        let res = interpreter::interpret(initial_context, program);
         println!("Your result is: {:?}", res);
     }
 }

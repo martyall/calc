@@ -4,7 +4,7 @@ use crate::ast::{Declaration, Expr, Opcode, Program, UOpcode};
 
 pub fn interpret_expr(context: &HashMap<String, Expr>, expr: &Expr) -> i32 {
     match expr {
-        Expr::Number(n) => n.clone(),
+        Expr::Number(n) => *n,
         Expr::UnaryOp(op, expr) => {
             let expr = interpret_expr(context, expr);
             match op {
@@ -21,20 +21,17 @@ pub fn interpret_expr(context: &HashMap<String, Expr>, expr: &Expr) -> i32 {
                 Opcode::Pow => lhs.pow(rhs as u32),
             }
         }
-        Expr::Variable(name) => {
-            let expr = match context.get(name) {
-                Some(expr) => expr,
-                None => panic!("Variable {} not found in context", name),
-            };
-            interpret_expr(context, expr)
-        }
+        Expr::Variable(name) => match context.get(name) {
+            Some(expr) => interpret_expr(context, expr),
+            None => panic!("Variable {} not found in context", name),
+        },
     }
 }
 
-pub fn interpret(initial_context: &HashMap<String, i32>, program: &Program) -> i32 {
+pub fn interpret(initial_context: HashMap<String, i32>, program: Program) -> i32 {
     let mut context = initial_context
         .iter()
-        .map(|(k, v)| (k.clone(), Expr::Number(v.clone())))
+        .map(|(k, v)| (k.clone(), Expr::Number(*v)))
         .collect::<HashMap<String, Expr>>();
     for decl in &program.decls {
         match decl {
@@ -42,7 +39,9 @@ pub fn interpret(initial_context: &HashMap<String, i32>, program: &Program) -> i
                 context.insert(name.clone(), expr.clone());
             }
             Declaration::PublicVar(name) => {
-                context.insert(name.clone(), Expr::Variable(name.clone()));
+                if !context.contains_key(name) {
+                    panic!("hey! you forgot to give me a value for {name}")
+                }
             }
         }
     }

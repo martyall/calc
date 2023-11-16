@@ -20,7 +20,9 @@ public_var = { "pub" ~ identifier ~ ";" }
 
 assignment = { "let" ~ identifier ~ "=" ~ expression ~ ";"}
 
-program = _{ SOI ~ public_var* ~ assignment* ~ expression ~ EOI }
+decls = { public_var+ ~ assignment* }
+
+program = _{ SOI ~ decls ~ expression ~ EOI }
 
 NEWLINE = _{ "\r\n" | "\n" }
 WHITESPACE = _{ " " | "\t" | NEWLINE }

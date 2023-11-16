@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum Opcode {
     Add,
     Sub,
@@ -10,7 +10,7 @@ pub enum Opcode {
     Pow,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum UOpcode {
     Neg,
 }
@@ -24,26 +24,27 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn inline(&self, context: &mut HashMap<String, Expr>) -> Self {
+    pub fn inline(self, context: &mut HashMap<String, Expr>) -> Self {
         match self {
-            Expr::Number(n) => Expr::Number(n.clone()),
+            Expr::Number(n) => Expr::Number(n),
             Expr::UnaryOp(op, expr) => {
                 let expr = expr.inline(context);
-                Expr::UnaryOp(op.clone(), Box::new(expr))
+                Expr::UnaryOp(op, Box::new(expr))
             }
             Expr::BinOp(lhs, op, rhs) => {
                 let lhs = lhs.inline(context);
                 let rhs = rhs.inline(context);
-                Expr::BinOp(Box::new(lhs), op.clone(), Box::new(rhs))
+                Expr::BinOp(Box::new(lhs), op, Box::new(rhs))
             }
             Expr::Variable(name) => {
-                let expr = match context.get(name) {
-                    Some(expr) => expr.clone(),
-                    None => Expr::Variable(name.clone()),
+                let maybe_existing = context.get(&name).cloned();
+                let new_expr = if let Some(existing) = maybe_existing {
+                    existing.inline(context)
+                } else {
+                    return Expr::Variable(name.clone());
                 };
-                let expr = expr.inline(context);
-                context.insert(name.clone(), expr.clone());
-                expr
+                context.insert(name.clone(), new_expr.clone());
+                new_expr
             }
         }
     }

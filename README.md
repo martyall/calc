@@ -7,6 +7,11 @@ Run a program
 
 ```
 
+Run with an initial context
+```
+> cargo run -- --input-file examples/poly.calc --context examples/poly.json
+```
+
 Inspect the AST in json format:
 ```
 > cargo run -- --input-file examples/simple_add.calc --serialize

@@ -1,6 +1,6 @@
 use pest_derive::Parser;
 
-use crate::ast::{Expr, Opcode, Statement, UOpcode};
+use crate::ast::{Declaration, Expr, Opcode, Program, UOpcode};
 use lazy_static::lazy_static;
 use pest::error::Error;
 use pest::iterators::{Pair, Pairs};
@@ -58,26 +58,42 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         .parse(pairs)
 }
 
-fn parse_statement(pairs: Pair<Rule>) -> Statement {
+fn parse_declaration(pairs: Pair<Rule>) -> Declaration {
     match pairs.as_rule() {
         Rule::assignment => {
             let mut pairs = pairs.into_inner();
             let name = pairs.next().unwrap().as_str().to_string();
             let expr = parse_expr(pairs.next().unwrap().into_inner());
-            Statement::VarAssignment(name, expr)
+            Declaration::VarAssignment(name, expr)
         }
-        rule => unreachable!("Statement::parse expected assignment, found {:?}", rule),
+        rule => unreachable!("Declaration::parse expected assignment, found {:?}", rule),
     }
 }
 
-pub fn parse(input: &str) -> Result<Vec<Statement>, Error<Rule>> {
+pub fn parse(input: &str) -> Result<Program, Error<Rule>> {
     let mut pairs = CalcParser::parse(Rule::program, input)?;
-    let mut statements = Vec::new();
-    while let Some(pair) = pairs.next() {
-        if pair.as_rule() == Rule::EOI {
+    println!("{:?}", pairs);
+    let mut declarations = Vec::new();
+    while let Some(pair) = pairs.peek() {
+        if pair.as_rule() == Rule::assignment {
+            declarations.push(parse_declaration(pair));
+            pairs.next();
+        } else {
             break;
         }
-        statements.push(parse_statement(pair));
     }
-    Ok(statements)
+    let pair = pairs.next().unwrap();
+    println!("{:?}", pair);
+    if pair.as_rule() == Rule::expression {
+        let expr = parse_expr(pair.into_inner());
+        return Ok(Program {
+            decls: declarations,
+            expr,
+        });
+    } else {
+        unreachable!(
+            "parse expected declaration or expression, found {:?}",
+            pair.as_rule()
+        );
+    }
 }

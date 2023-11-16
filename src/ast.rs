@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+use std::collections::HashMap;
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Opcode {
     Add,
     Sub,
@@ -8,12 +10,12 @@ pub enum Opcode {
     Pow,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum UOpcode {
     Neg,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Expr {
     Number(i32),
     Variable(String),
@@ -21,7 +23,39 @@ pub enum Expr {
     BinOp(Box<Expr>, Opcode, Box<Expr>),
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub enum Statement {
+impl Expr {
+    pub fn inline(&self, context: &mut HashMap<String, Expr>) -> Self {
+        match self {
+            Expr::Number(n) => Expr::Number(n.clone()),
+            Expr::UnaryOp(op, expr) => {
+                let expr = expr.inline(context);
+                Expr::UnaryOp(op.clone(), Box::new(expr))
+            }
+            Expr::BinOp(lhs, op, rhs) => {
+                let lhs = lhs.inline(context);
+                let rhs = rhs.inline(context);
+                Expr::BinOp(Box::new(lhs), op.clone(), Box::new(rhs))
+            }
+            Expr::Variable(name) => {
+                let expr = match context.get(name) {
+                    Some(expr) => expr.clone(),
+                    None => panic!("Variable {} not found in context", name),
+                };
+                let expr = expr.inline(context);
+                context.insert(name.clone(), expr.clone());
+                expr
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub enum Declaration {
     VarAssignment(String, Expr),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct Program {
+    pub decls: Vec<Declaration>,
+    pub expr: Expr,
 }

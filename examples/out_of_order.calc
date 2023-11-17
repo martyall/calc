@@ -1,0 +1,6 @@
+pub p;
+let a = b;
+let b = c;
+let c = p + 1;
+p * c
+

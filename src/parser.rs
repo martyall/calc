@@ -108,5 +108,5 @@ pub fn parse(input: &str) -> Result<Program, Error<Rule>> {
     let decls = parse_decls(&mut decls_pair.into_inner());
     let expr_pair = pairs.next().unwrap();
     let expr = parse_expr(expr_pair.into_inner());
-    Ok(Program { decls, expr })
+    Ok(Program::new(decls, expr))
 }

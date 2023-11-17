@@ -108,7 +108,11 @@ impl Program {
             }
             ident_set.insert(ident);
         }
-        Program { decls, expr }
+        let sorted_decls = sort(decls);
+        Program {
+            decls: sorted_decls,
+            expr,
+        }
     }
 }
 
@@ -152,7 +156,7 @@ fn dependency_graph(decls: &Vec<Declaration>) -> DiGraph<String, ()> {
 
 // sort the declarations so that all the dependencies of a declaration appear
 // before it in the list.
-pub fn sort(decls: Vec<Declaration>) -> Vec<Declaration> {
+fn sort(decls: Vec<Declaration>) -> Vec<Declaration> {
     let mut sorted = Vec::new();
     let graph = dependency_graph(&decls);
     let top_sorted = toposort(&graph, None);

@@ -2,4 +2,4 @@ pub x;
 pub y;
 let w = v^2 + 1;
 let v = y * x + 2;
-v^2 -w + 1
+-w + v^2 + 1

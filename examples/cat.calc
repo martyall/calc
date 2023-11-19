@@ -1,3 +1,4 @@
+pub z;
 let x = 4^2;
-let y = 2 * x - 1;
+let y = 2 * x * z - 1 ;
 x + y

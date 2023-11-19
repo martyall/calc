@@ -1,3 +1,4 @@
+pub z;
 let x = 4;
 let y = x^2 + x + 1;
-x + y
+x + y + z

@@ -14,7 +14,7 @@ struct Args {
     input_file: String,
 
     #[arg(short, long)]
-    context: String,
+    context: Option<String>,
 
     #[arg(short, long)]
     serialize: bool,
@@ -37,8 +37,11 @@ fn main() {
         let serialized = serde_json::to_string(&program).unwrap();
         println!("{}", serialized);
     } else {
-        let initial_context = read_context(&args.context).unwrap_or(HashMap::new());
-        let res = interpreter::interpret(&initial_context, &program);
+        let initial_context = match args.context {
+            None => HashMap::new(),
+            Some(ref file_path) => read_context(&file_path).unwrap_or(HashMap::new()),
+        };
+        let res = interpreter::interpret(initial_context, program);
         println!("Your result is: {:?}", res);
     }
 }

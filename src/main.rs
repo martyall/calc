@@ -2,6 +2,7 @@ pub mod ast;
 pub mod interpreter;
 pub mod parser;
 
+use ast::Ident;
 use clap::Parser;
 use std::collections::HashMap;
 use std::fs::File;
@@ -20,7 +21,7 @@ struct Args {
     serialize: bool,
 }
 
-fn read_context(file_path: &str) -> io::Result<HashMap<String, i32>> {
+fn read_context(file_path: &str) -> io::Result<HashMap<Ident, i32>> {
     let file = File::open(file_path)?;
     let data = serde_json::from_reader(file)?;
     Ok(data)

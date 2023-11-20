@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{Declaration, Expr, Ident, Opcode, Program, UOpcode};
+use crate::ast::{inline, Declaration, Expr, Ident, Opcode, Program, UOpcode};
 
 pub fn interpret_expr(context: &HashMap<Ident, Expr>, expr: &Expr) -> i32 {
     match expr {
@@ -45,7 +45,7 @@ pub fn interpret(initial_context: HashMap<Ident, i32>, program: Program) -> i32 
             }
         }
     }
-    let expr = program.expr.inline(&mut context);
+    let expr = inline(&mut context, program.expr);
     interpret_expr(&context, &expr)
 }
 

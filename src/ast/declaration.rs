@@ -8,7 +8,7 @@ pub enum Declaration {
 }
 
 impl Declaration {
-    // get the variable name for this declaration
+    // get the variable name bound in this declaration
     pub fn get_identifier(&self) -> Ident {
         match self {
             Declaration::VarAssignment(name, _) => name.clone(),

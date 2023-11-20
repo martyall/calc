@@ -104,7 +104,7 @@ pub fn parse(input: &str) -> Result<Program, Error<Rule>> {
     let decls = parse_decls(&mut decls_pair.into_inner());
     let expr_pair = pairs.next().unwrap();
     let expr = parse_expr(expr_pair.into_inner());
-    Ok(Program::new(decls, expr))
+    Ok(Program::new(decls, expr).unwrap())
 }
 
 pub fn parse_single_expression(input: &str) -> Result<Expr, Error<Rule>> {
@@ -216,6 +216,7 @@ mod parser_tests {
                     Box::new(Expr::Number(2))
                 )
             )
+            .unwrap()
         );
     }
 }

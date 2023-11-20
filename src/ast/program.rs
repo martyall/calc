@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::{HashMap, HashSet};
 
+use super::error::ASTError;
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Program {
     pub decls: Vec<Declaration>,
@@ -12,20 +14,24 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn new(decls: Vec<Declaration>, expr: Expr) -> Self {
+    // the smart constructor returns a program which has the property that
+    // declarations only contain identifiers which are bound in previous declarations.
+    // this means that if you are building up a context for evaluation in order, you
+    // can be sure that all the variables you need to substitute will be bound in the context.
+    pub fn new(decls: Vec<Declaration>, expr: Expr) -> Result<Self, ASTError> {
         let mut ident_set: HashSet<Ident> = HashSet::new();
         for decl in &decls {
             let ident = decl.get_identifier();
             if ident_set.contains(&ident) {
-                panic!("Duplicate identifier {:?}", ident);
+                return Err(ASTError::DuplicateIdentifier(ident));
             }
             ident_set.insert(ident);
         }
-        let sorted_decls = sort(decls);
-        Program {
+        let sorted_decls = sort(decls)?;
+        Ok(Program {
             decls: sorted_decls,
             expr,
-        }
+        })
     }
 }
 
@@ -68,8 +74,8 @@ fn dependency_graph(decls: &Vec<Declaration>) -> DiGraph<Ident, ()> {
 }
 
 // sort the declarations so that all the dependencies of a declaration appear
-// before it in the list.
-fn sort(decls: Vec<Declaration>) -> Vec<Declaration> {
+// before it in the list (i.e. topologically sorted).
+fn sort(decls: Vec<Declaration>) -> Result<Vec<Declaration>, ASTError> {
     let mut sorted = Vec::new();
     let graph = dependency_graph(&decls);
     let top_sorted = toposort(&graph, None);
@@ -79,7 +85,7 @@ fn sort(decls: Vec<Declaration>) -> Vec<Declaration> {
                 let name = graph.node_weight(node).unwrap();
                 let decl = match find_decl(name.clone(), decls.clone()) {
                     Some(decl) => decl,
-                    None => panic!("Declaration for {:?} not found", name),
+                    None => return Err(ASTError::UnboundIdentifier(name.clone())),
                 };
                 if decl.get_dependencies().is_empty() {
                     sorted.insert(0, decl)
@@ -87,9 +93,12 @@ fn sort(decls: Vec<Declaration>) -> Vec<Declaration> {
                     sorted.push(decl);
                 }
             }
-            sorted
+            Ok(sorted)
         }
-        Err(cycle) => panic!("Cycle detected: {:?}", cycle),
+        Err(cycle) => {
+            let c = graph.node_weight(cycle.node_id()).unwrap();
+            Err(ASTError::CyclicDependency(c.clone()))
+        }
     }
 }
 
@@ -98,13 +107,16 @@ mod ast_test {
     use super::*;
 
     #[test]
-    #[should_panic(expected = "Duplicate identifier Ident(\"x\")")]
     fn duplicate_identifier_test() {
+        let ident = Ident::new("x");
         let decls: Vec<Declaration> = vec![
-            Declaration::VarAssignment(Ident::new("x"), Expr::Number(1)),
-            Declaration::VarAssignment(Ident::new("x"), Expr::Number(2)),
+            Declaration::VarAssignment(ident.clone(), Expr::Number(1)),
+            Declaration::VarAssignment(ident.clone(), Expr::Number(2)),
         ];
-        Program::new(decls, Expr::Number(1));
+        match Program::new(decls, Expr::Number(1)) {
+            Err(ASTError::DuplicateIdentifier(_)) => (),
+            _ => panic!("Expected DuplicateIdentifier error"),
+        };
     }
 
     #[test]
@@ -118,7 +130,7 @@ mod ast_test {
             Declaration::VarAssignment(Ident::new("a"), Expr::Variable(Ident::new("b"))),
             Declaration::VarAssignment(Ident::new("b"), Expr::Number(1)),
         ];
-        let sorted = sort(decls);
+        let sorted = sort(decls).unwrap();
         assert_eq!(
             sorted,
             vec![

@@ -1,8 +1,9 @@
 pub mod ast;
+pub mod compiler;
 pub mod interpreter;
 pub mod parser;
 
-use ast::{inline, optimize, Ident, Program};
+use ast::Ident;
 use clap::Parser;
 use std::collections::HashMap;
 use std::fs::File;
@@ -33,15 +34,9 @@ fn main() {
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     let program = parser::parse(&contents).unwrap();
-
-    let public_vars = program.public_variables();
-    let expr = optimize(inline(program));
+    let program = compiler::compile(program).unwrap();
 
     if args.serialize {
-        let program = Program {
-            decls: public_vars,
-            expr,
-        };
         let serialized = serde_json::to_string(&program).unwrap();
         println!("{}", serialized);
     } else {
@@ -52,7 +47,7 @@ fn main() {
 
         let mut context = interpreter::Context::from(initial_context);
 
-        let res = interpreter::interpret(&mut context, &expr);
+        let res = interpreter::interpret(&mut context, &program.expr);
         println!("Your result is: {:?}", res.unwrap());
     }
 }

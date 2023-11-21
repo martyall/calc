@@ -1,6 +1,7 @@
 use pest_derive::Parser;
 
 use crate::ast::{Declaration, Expr, Ident, Opcode, Program, UOpcode};
+use anyhow::Result;
 use lazy_static::lazy_static;
 use pest::error::Error;
 use pest::iterators::{Pair, Pairs};
@@ -98,13 +99,13 @@ fn parse_decls(pairs: &mut Pairs<Rule>) -> Vec<Declaration> {
     declarations
 }
 
-pub fn parse(input: &str) -> Result<Program, Error<Rule>> {
+pub fn parse(input: &str) -> Result<Program> {
     let mut pairs = CalcParser::parse(Rule::program, input)?;
     let decls_pair = pairs.next().unwrap();
     let decls = parse_decls(&mut decls_pair.into_inner());
     let expr_pair = pairs.next().unwrap();
     let expr = parse_expr(expr_pair.into_inner());
-    Ok(Program::new(decls, expr).unwrap())
+    Program::new(decls, expr)
 }
 
 pub fn parse_single_expression(input: &str) -> Result<Expr, Error<Rule>> {

@@ -53,6 +53,6 @@ fn main() {
         let mut context = interpreter::Context::from(initial_context);
 
         let res = interpreter::interpret_expr(&mut context, &expr);
-        println!("Your result is: {:?}", res);
+        println!("Your result is: {:?}", res.unwrap());
     }
 }

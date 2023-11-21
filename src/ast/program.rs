@@ -1,12 +1,11 @@
-use crate::ast::declaration::Declaration;
-use crate::ast::expression::{Expr, Ident};
-use petgraph::{algo::toposort, graph::DiGraph};
-use serde::{Deserialize, Serialize};
-
-use std::collections::{HashMap, HashSet};
-
 use super::declaration::find_declaration;
 use super::error::ASTError;
+use crate::ast::declaration::Declaration;
+use crate::ast::expression::{Expr, Ident};
+use anyhow::{anyhow, Result};
+use petgraph::{algo::toposort, graph::DiGraph};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Program {
@@ -19,12 +18,12 @@ impl Program {
     // declarations only contain identifiers which are bound in previous declarations.
     // this means that if you are building up a context for evaluation in order, you
     // can be sure that all the variables you need to substitute will be bound in the context.
-    pub fn new(decls: Vec<Declaration>, expr: Expr) -> Result<Self, ASTError> {
+    pub fn new(decls: Vec<Declaration>, expr: Expr) -> Result<Self> {
         let mut ident_set: HashSet<Ident> = HashSet::new();
         for decl in &decls {
             let ident = decl.get_identifier();
             if ident_set.contains(&ident) {
-                return Err(ASTError::DuplicateIdentifier(ident));
+                return Err(anyhow!(ASTError::DuplicateIdentifier(ident)));
             }
             ident_set.insert(ident);
         }
@@ -98,6 +97,7 @@ fn sort(decls: Vec<Declaration>) -> Result<Vec<Declaration>, ASTError> {
 #[cfg(test)]
 mod ast_test {
     use super::*;
+    use crate::ast::error::ASTError;
 
     #[test]
     fn duplicate_identifier_test() {
@@ -107,7 +107,10 @@ mod ast_test {
             Declaration::VarAssignment(ident.clone(), Expr::Number(2)),
         ];
         match Program::new(decls, Expr::Number(1)) {
-            Err(ASTError::DuplicateIdentifier(_)) => (),
+            Err(err) => match err.downcast_ref() {
+                Some(ASTError::DuplicateIdentifier(_)) => (),
+                _ => panic!("Expected DuplicateIdentifier error"),
+            },
             _ => panic!("Expected DuplicateIdentifier error"),
         };
     }

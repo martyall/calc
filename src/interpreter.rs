@@ -1,8 +1,34 @@
 use std::collections::HashMap;
 
-use crate::ast::{inline, Declaration, Expr, Ident, Opcode, Program, UOpcode};
+use crate::ast::{inline, Expr, Ident, Opcode, Program, UOpcode};
 
-pub fn interpret_expr(context: &HashMap<Ident, Expr>, expr: &Expr) -> i32 {
+pub struct Context {
+    context: HashMap<Ident, Expr>,
+}
+
+impl Context {
+    pub fn new() -> Self {
+        Context {
+            context: HashMap::new(),
+        }
+    }
+
+    fn get(&self, name: &Ident) -> Option<Expr> {
+        self.context.get(name).cloned()
+    }
+}
+
+impl From<HashMap<Ident, i32>> for Context {
+    fn from(initial_context: HashMap<Ident, i32>) -> Self {
+        let context = initial_context
+            .iter()
+            .map(|(k, v)| (k.clone(), Expr::Number(*v)))
+            .collect();
+        Context { context }
+    }
+}
+
+pub fn interpret_expr(context: &mut Context, expr: &Expr) -> i32 {
     match expr {
         Expr::Number(n) => *n,
         Expr::UnaryOp(op, expr) => {
@@ -22,31 +48,16 @@ pub fn interpret_expr(context: &HashMap<Ident, Expr>, expr: &Expr) -> i32 {
             }
         }
         Expr::Variable(name) => match context.get(name) {
-            Some(expr) => interpret_expr(context, expr),
+            Some(expr) => interpret_expr(context, &expr),
             None => panic!("Variable {:?} not found in context", name),
         },
     }
 }
 
 pub fn interpret(initial_context: HashMap<Ident, i32>, program: Program) -> i32 {
-    let mut context = initial_context
-        .iter()
-        .map(|(k, v)| (k.clone(), Expr::Number(*v)))
-        .collect::<HashMap<Ident, Expr>>();
-    for decl in &program.decls {
-        match decl {
-            Declaration::VarAssignment(name, expr) => {
-                context.insert(name.clone(), expr.clone());
-            }
-            Declaration::PublicVar(name) => {
-                if !context.contains_key(name) {
-                    panic!("hey! you forgot to give me a value for {:?}", name)
-                }
-            }
-        }
-    }
-    let expr = inline(&mut context, program.expr);
-    interpret_expr(&context, &expr)
+    let mut context: Context = initial_context.into();
+    let expr = inline(program);
+    interpret_expr(&mut context, &expr)
 }
 
 #[cfg(test)]
@@ -58,7 +69,7 @@ mod interpreter_tests {
     fn no_parens_test() {
         let input = "22 * 44 + 66";
         let expr = parser::parse_single_expression(input).unwrap();
-        let mut context = HashMap::new();
+        let mut context = Context::new();
         assert_eq!(interpret_expr(&mut context, &expr), 1034);
     }
 
@@ -66,15 +77,15 @@ mod interpreter_tests {
     fn parens_test() {
         let input = "22 * (44 + 66)";
         let expr = parser::parse_single_expression(input).unwrap();
-        let context = HashMap::new();
-        assert_eq!(interpret_expr(&context, &expr), 2420);
+        let mut context = Context::new();
+        assert_eq!(interpret_expr(&mut context, &expr), 2420);
     }
 
     #[test]
     fn pow_test() {
         let input = "2^4 + 1";
         let expr = parser::parse_single_expression(input).unwrap();
-        let context = HashMap::new();
-        assert_eq!(interpret_expr(&context, &expr), 17);
+        let mut context = Context::new();
+        assert_eq!(interpret_expr(&mut context, &expr), 17);
     }
 }

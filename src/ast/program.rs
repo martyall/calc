@@ -19,7 +19,7 @@ impl Program {
     // this means that if you are building up a context for evaluation in order, you
     // can be sure that all the variables you need to substitute will be bound in the context.
     pub fn new(decls: Vec<Declaration>, expr: Expr) -> Result<Self> {
-        let sorted_decls = sort(decls.clone())?;
+        let sorted_decls = sort(decls)?;
         let mut decl_ident_set: HashSet<Ident> = HashSet::new();
         for decl in sorted_decls.clone() {
             let ident = decl.get_identifier();

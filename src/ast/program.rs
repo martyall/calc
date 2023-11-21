@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::{HashMap, HashSet};
 
+use super::declaration::find_declaration;
 use super::error::ASTError;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -33,25 +34,17 @@ impl Program {
             expr,
         })
     }
-}
 
-// find the declaration for a given variable name
-fn find_decl(name: Ident, decls: Vec<Declaration>) -> Option<Declaration> {
-    for decl in decls {
-        match decl {
-            Declaration::VarAssignment(n, expr) => {
-                if n == name {
-                    return Some(Declaration::VarAssignment(n.clone(), expr.clone()));
-                }
-            }
-            Declaration::PublicVar(n) => {
-                if n == name {
-                    return Some(Declaration::PublicVar(n.clone()));
-                }
-            }
-        }
+    pub fn public_variables(&self) -> Vec<Declaration> {
+        self.decls
+            .iter()
+            .filter(|decl| match decl {
+                Declaration::PublicVar(_) => true,
+                _ => false,
+            })
+            .cloned()
+            .collect()
     }
-    None
 }
 
 // build a dependency graph for the declarations where `y -> x` means that
@@ -83,7 +76,7 @@ fn sort(decls: Vec<Declaration>) -> Result<Vec<Declaration>, ASTError> {
         Ok(nodes) => {
             for node in nodes {
                 let name = graph.node_weight(node).unwrap();
-                let decl = match find_decl(name.clone(), decls.clone()) {
+                let decl = match find_declaration(name.clone(), decls.clone()) {
                     Some(decl) => decl,
                     None => return Err(ASTError::UnboundIdentifier(name.clone())),
                 };

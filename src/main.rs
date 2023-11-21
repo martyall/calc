@@ -2,7 +2,7 @@ pub mod ast;
 pub mod interpreter;
 pub mod parser;
 
-use ast::Ident;
+use ast::{inline, optimize, Ident, Program};
 use clap::Parser;
 use std::collections::HashMap;
 use std::fs::File;
@@ -34,7 +34,14 @@ fn main() {
     file.read_to_string(&mut contents).unwrap();
     let program = parser::parse(&contents).unwrap();
 
+    let public_vars = program.public_variables();
+    let expr = optimize(inline(program));
+
     if args.serialize {
+        let program = Program {
+            decls: public_vars,
+            expr,
+        };
         let serialized = serde_json::to_string(&program).unwrap();
         println!("{}", serialized);
     } else {
@@ -42,7 +49,10 @@ fn main() {
             None => HashMap::new(),
             Some(ref file_path) => read_context(&file_path).unwrap_or(HashMap::new()),
         };
-        let res = interpreter::interpret(initial_context, program);
+
+        let mut context = interpreter::Context::from(initial_context);
+
+        let res = interpreter::interpret_expr(&mut context, &expr);
         println!("Your result is: {:?}", res);
     }
 }

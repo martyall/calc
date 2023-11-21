@@ -29,3 +29,22 @@ impl Declaration {
         }
     }
 }
+
+// find the declaration for a given variable name
+pub fn find_declaration(name: Ident, decls: Vec<Declaration>) -> Option<Declaration> {
+    for decl in decls {
+        match decl {
+            Declaration::VarAssignment(n, expr) => {
+                if n == name {
+                    return Some(Declaration::VarAssignment(n.clone(), expr.clone()));
+                }
+            }
+            Declaration::PublicVar(n) => {
+                if n == name {
+                    return Some(Declaration::PublicVar(n.clone()));
+                }
+            }
+        }
+    }
+    None
+}

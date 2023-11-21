@@ -19,22 +19,37 @@ impl Program {
     // this means that if you are building up a context for evaluation in order, you
     // can be sure that all the variables you need to substitute will be bound in the context.
     pub fn new(decls: Vec<Declaration>, expr: Expr) -> Result<Self> {
-        let mut ident_set: HashSet<Ident> = HashSet::new();
-        for decl in &decls {
+        let sorted_decls = sort(decls)?;
+        let mut decl_ident_set: HashSet<Ident> = HashSet::new();
+        for decl in sorted_decls.clone() {
             let ident = decl.get_identifier();
-            if ident_set.contains(&ident) {
+            // check that no variable is declared twice
+            if decl_ident_set.contains(&ident) {
                 return Err(anyhow!(ASTError::DuplicateIdentifier(ident)));
             }
-            ident_set.insert(ident);
+            let vars = decl.get_dependencies();
+            // check that all the variables used in the expression are bound in previous declarations
+            for var in vars {
+                if !decl_ident_set.contains(&var) {
+                    return Err(anyhow!(ASTError::UnboundIdentifier(var)));
+                }
+            }
+            decl_ident_set.insert(ident);
         }
-        let sorted_decls = sort(decls)?;
+
+        // check that the expression only uses variables bound in the declarations
+        for var in expr.variables() {
+            if !decl_ident_set.contains(&var) {
+                return Err(anyhow!(ASTError::UnboundIdentifier(var)));
+            }
+        }
+
         Ok(Program {
             decls: sorted_decls,
             expr,
         })
     }
-
-    pub fn public_variables(&self) -> Vec<Declaration> {
+    pub fn public_variable_decls(&self) -> Vec<Declaration> {
         self.decls
             .iter()
             .filter(|decl| match decl {

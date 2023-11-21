@@ -1,4 +1,4 @@
-use crate::ast::{error::ASTError, inline, Expr, Ident, Opcode, Program, UOpcode};
+use crate::ast::{error::ASTError, Expr, Ident, Opcode, UOpcode};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
@@ -28,18 +28,18 @@ impl From<HashMap<Ident, i32>> for Context {
     }
 }
 
-pub fn interpret_expr(context: &mut Context, expr: &Expr) -> Result<i32> {
+pub fn interpret(context: &mut Context, expr: &Expr) -> Result<i32> {
     match expr {
         Expr::Number(n) => Ok(*n),
         Expr::UnaryOp(op, expr) => {
-            let expr = interpret_expr(context, expr)?;
+            let expr = interpret(context, expr)?;
             match op {
                 UOpcode::Neg => Ok(-expr),
             }
         }
         Expr::BinOp(lhs, op, rhs) => {
-            let lhs = interpret_expr(context, lhs)?;
-            let rhs = interpret_expr(context, rhs)?;
+            let lhs = interpret(context, lhs)?;
+            let rhs = interpret(context, rhs)?;
             match op {
                 Opcode::Add => Ok(lhs + rhs),
                 Opcode::Sub => Ok(lhs - rhs),
@@ -48,16 +48,10 @@ pub fn interpret_expr(context: &mut Context, expr: &Expr) -> Result<i32> {
             }
         }
         Expr::Variable(name) => match context.get(name) {
-            Some(expr) => interpret_expr(context, &expr),
+            Some(expr) => interpret(context, &expr),
             None => return Err(anyhow!(ASTError::UnboundIdentifier(name.clone()))),
         },
     }
-}
-
-pub fn interpret(initial_context: HashMap<Ident, i32>, program: Program) -> Result<i32> {
-    let mut context: Context = initial_context.into();
-    let expr = inline(program);
-    interpret_expr(&mut context, &expr)
 }
 
 #[cfg(test)]
@@ -70,7 +64,7 @@ mod interpreter_tests {
         let input = "22 * 44 + 66";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret_expr(&mut context, &expr).unwrap(), 1034);
+        assert_eq!(interpret(&mut context, &expr).unwrap(), 1034);
     }
 
     #[test]
@@ -78,7 +72,7 @@ mod interpreter_tests {
         let input = "22 * (44 + 66)";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret_expr(&mut context, &expr).unwrap(), 2420);
+        assert_eq!(interpret(&mut context, &expr).unwrap(), 2420);
     }
 
     #[test]
@@ -86,6 +80,6 @@ mod interpreter_tests {
         let input = "2^4 + 1";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret_expr(&mut context, &expr).unwrap(), 17);
+        assert_eq!(interpret(&mut context, &expr).unwrap(), 17);
     }
 }

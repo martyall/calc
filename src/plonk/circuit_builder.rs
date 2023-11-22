@@ -35,3 +35,18 @@ fn add_public_inputs(inputs: Vec<Ident>, backend: &mut CircuitBackend) -> HashMa
     }
     public_inputs
 }
+
+fn build_circuit(
+    context: HashMap<Ident, Target>,
+    backend: &mut CircuitBackend,
+    expr: Expr,
+) -> Result<()> {
+    match expr {
+        Expr::Number(n) => {
+            let n = F::from_canonical_u32(n.rem_euclid(F::order()) as u32);
+            let t = backend.builder.constant(F::from_canonical_u32(n));
+            backend.builder.mul_cons
+            Ok(())
+        }
+    }
+}

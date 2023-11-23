@@ -45,4 +45,20 @@ impl Expr {
             Expr::Variable(name) => vec![name.clone()],
         }
     }
+
+    pub fn format(&self) -> String {
+        match self {
+            Expr::Number(n) => n.to_string(),
+            Expr::UnaryOp(op, expr) => match op {
+                UOpcode::Neg => format!("-({})", expr.format()),
+            },
+            Expr::BinOp(lhs, op, rhs) => match op {
+                Opcode::Add => format!("({} + {})", lhs.format(), rhs.format()),
+                Opcode::Sub => format!("({} - {})", lhs.format(), rhs.format()),
+                Opcode::Mul => format!("({} * {})", lhs.format(), rhs.format()),
+                Opcode::Pow => format!("({} ^ {})", lhs.format(), rhs.format()),
+            },
+            Expr::Variable(name) => name.to_string(),
+        }
+    }
 }

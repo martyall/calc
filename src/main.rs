@@ -6,6 +6,7 @@ pub mod plonk;
 
 use ast::Ident;
 use clap::Parser;
+use plonk::prove;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read};
@@ -46,9 +47,35 @@ fn main() {
             Some(ref file_path) => read_context(&file_path).unwrap_or(HashMap::new()),
         };
 
-        let mut context = interpreter::Context::from(initial_context);
+        let interpreter_result = {
+            let mut context = interpreter::Context::from(initial_context.clone());
+            interpreter::interpret(&mut context, &program.expr)
+        };
 
-        let res = interpreter::interpret(&mut context, &program.expr);
-        println!("Your result is: {:?}", res.unwrap());
+        println!(
+            "According to the interpreter, your result is: {:?}",
+            interpreter_result.unwrap()
+        );
+
+        let program_expr = program.expr.clone();
+
+        let proving_data = prove(initial_context, program).unwrap();
+        let proof = proving_data.data.prove(proving_data.pw).unwrap();
+        let formatted_input: String = proving_data
+            .inputs
+            .into_iter()
+            .zip(proof.public_inputs.clone().into_iter())
+            .map(|(a, b)| format!("{}={}", a, b))
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        println!(
+            "Proof for equation {:?} = {:?},  where {:?}",
+            program_expr,
+            proof.public_inputs.last().unwrap(),
+            formatted_input
+        );
+        proving_data.data.verify(proof).unwrap();
+        println!("Verified!")
     }
 }

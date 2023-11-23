@@ -13,7 +13,7 @@ impl Context {
         }
     }
 
-    fn get(&self, name: &Ident) -> Option<Expr> {
+    pub fn get(&self, name: &Ident) -> Option<Expr> {
         self.context.get(name).cloned()
     }
 }

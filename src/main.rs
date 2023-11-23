@@ -6,7 +6,8 @@ pub mod plonk;
 
 use ast::Ident;
 use clap::Parser;
-use plonk::prove;
+use plonk::{prove, F};
+use plonky2::field::types::Field;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read};
@@ -70,9 +71,10 @@ fn main() {
             .join(", ");
 
         println!(
-            "Proof for equation {:?} = {:?},  where {:?}",
-            program_expr,
+            "Proof for equation {} = {:?} (mod {:?}),  where {}",
+            program_expr.format(),
             proof.public_inputs.last().unwrap(),
+            F::order(),
             formatted_input
         );
         proving_data.data.verify(proof).unwrap();

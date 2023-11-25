@@ -1,4 +1,3 @@
-use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
@@ -14,51 +13,153 @@ pub enum UOpcode {
     Neg,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Clone, Display)]
-pub struct Ident(String);
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Deserialize, Serialize)]
+pub struct Ident {
+    pub value: String,
+}
 
 impl Ident {
     pub fn new(s: &str) -> Self {
-        Ident(s.to_string())
+        Ident {
+            value: s.to_string(),
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub enum Expr {
-    Number(i32),
-    Variable(Ident),
-    UnaryOp(UOpcode, Box<Expr>),
-    BinOp(Box<Expr>, Opcode, Box<Expr>),
+impl std::fmt::Display for Ident {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", &self.value)
+    }
 }
 
-impl Expr {
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Expr<A> {
+    Number {
+        ann: A,
+        value: i32,
+    },
+    Variable {
+        ann: A,
+        value: Ident,
+    },
+    UnaryOp {
+        ann: A,
+        op: UOpcode,
+        expr: Box<Expr<A>>,
+    },
+    BinOp {
+        ann: A,
+        lhs: Box<Expr<A>>,
+        op: Opcode,
+        rhs: Box<Expr<A>>,
+    },
+}
+
+impl<A: Clone> Expr<A> {
     // get all of the variables that appear in an expression
     pub fn variables(&self) -> Vec<Ident> {
         match self {
-            Expr::Number(_) => vec![],
-            Expr::UnaryOp(_, expr) => expr.variables(),
-            Expr::BinOp(lhs, _, rhs) => {
+            Expr::Number { .. } => vec![],
+            Expr::UnaryOp { expr, .. } => expr.variables(),
+            Expr::BinOp { lhs, rhs, .. } => {
                 let mut deps = lhs.variables();
                 deps.append(&mut rhs.variables());
                 deps
             }
-            Expr::Variable(name) => vec![name.clone()],
+            Expr::Variable { value, .. } => vec![value.clone()],
         }
     }
 
     pub fn format(&self) -> String {
         match self {
-            Expr::Number(n) => n.to_string(),
-            Expr::UnaryOp(op, expr) => match op {
+            Expr::Number { value, .. } => value.to_string(),
+            Expr::UnaryOp { op, expr, .. } => match op {
                 UOpcode::Neg => format!("-({})", expr.format()),
             },
-            Expr::BinOp(lhs, op, rhs) => match op {
+            Expr::BinOp { lhs, op, rhs, .. } => match op {
                 Opcode::Add => format!("({} + {})", lhs.format(), rhs.format()),
                 Opcode::Sub => format!("({} - {})", lhs.format(), rhs.format()),
                 Opcode::Mul => format!("({} * {})", lhs.format(), rhs.format()),
                 Opcode::Pow => format!("({} ^ {})", lhs.format(), rhs.format()),
             },
-            Expr::Variable(name) => name.to_string(),
+            Expr::Variable { value, .. } => value.value.clone(),
+        }
+    }
+
+    pub fn clear_annotations(self) -> Expr<()> {
+        match self {
+            Expr::Number { value, .. } => Expr::Number { ann: (), value },
+            Expr::UnaryOp { op, expr, .. } => Expr::UnaryOp {
+                ann: (),
+                op,
+                expr: Box::new(expr.clear_annotations()),
+            },
+            Expr::BinOp { lhs, op, rhs, .. } => Expr::BinOp {
+                ann: (),
+                lhs: Box::new(lhs.clear_annotations()),
+                op,
+                rhs: Box::new(rhs.clear_annotations()),
+            },
+            Expr::Variable { value, .. } => Expr::Variable { ann: (), value },
+        }
+    }
+}
+
+impl<A: Default> Expr<A> {
+    pub fn number_default(value: i32) -> Self {
+        Expr::Number {
+            ann: A::default(),
+            value,
+        }
+    }
+
+    pub fn variable_default(value: Ident) -> Self {
+        Expr::Variable {
+            ann: A::default(),
+            value,
+        }
+    }
+
+    pub fn unary_op_default(op: UOpcode, expr: Expr<A>) -> Self {
+        Expr::UnaryOp {
+            ann: A::default(),
+            op,
+            expr: Box::new(expr),
+        }
+    }
+
+    pub fn binary_op_default(lhs: Expr<A>, op: Opcode, rhs: Expr<A>) -> Self {
+        Expr::BinOp {
+            ann: A::default(),
+            lhs: Box::new(lhs),
+            op,
+            rhs: Box::new(rhs),
+        }
+    }
+}
+
+impl<A: Clone> Clone for Expr<A> {
+    fn clone(&self) -> Self {
+        match self {
+            Expr::Number { ann, value } => Expr::Number {
+                ann: ann.clone(),
+                value: *value,
+            },
+            Expr::Variable { ann, value } => Expr::Variable {
+                ann: ann.clone(),
+                value: value.clone(), // Assuming Ident implements Clone
+            },
+            Expr::UnaryOp { ann, op, expr } => Expr::UnaryOp {
+                ann: ann.clone(),
+                op: *op, // Assuming UOpcode is Clone
+                expr: Box::new((**expr).clone()),
+            },
+            Expr::BinOp { ann, lhs, op, rhs } => Expr::BinOp {
+                ann: ann.clone(),
+                op: *op, // Assuming Opcode is Clone
+                lhs: Box::new((**lhs).clone()),
+                rhs: Box::new((**rhs).clone()),
+            },
         }
     }
 }

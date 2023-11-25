@@ -11,9 +11,9 @@ use anyhow::Result;
 
 use super::ProvableCircuit;
 
-pub fn prove(
+pub fn prove<A>(
     initital_context: HashMap<Ident, i32>,
-    program: CompiledProgram,
+    program: CompiledProgram<A>,
 ) -> Result<ProvingData> {
     let mut circuit = build_circuit(program);
     let (pw, inputs) = set_public_inputs(&mut circuit, &initital_context);

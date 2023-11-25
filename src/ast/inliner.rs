@@ -4,64 +4,76 @@ use crate::ast::declaration::Declaration;
 use crate::ast::expression::{Expr, Ident};
 use crate::ast::program::Program;
 
-pub struct Context {
-    context: HashMap<Ident, Expr>,
+pub struct Context<A> {
+    context: HashMap<Ident, Expr<A>>,
 }
 
-impl Context {
+impl<A> Context<A> {
     fn new() -> Self {
         Context {
             context: HashMap::new(),
         }
     }
 
-    fn insert(&mut self, name: Ident, expr: Expr) {
+    fn insert(&mut self, name: Ident, expr: Expr<A>) {
         self.context.insert(name, expr);
     }
 
-    fn get(&self, name: &Ident) -> Option<&Expr> {
+    fn get(&self, name: &Ident) -> Option<&Expr<A>> {
         self.context.get(name)
     }
 }
 
 // inline all variables in the expression using the context.
-fn inline_expr(context: &mut Context, expr: Expr) -> Expr {
+fn inline_expr<A: Clone>(context: &mut Context<A>, expr: Expr<A>) -> Expr<A> {
     match expr {
-        Expr::Number(n) => Expr::Number(n),
-        Expr::UnaryOp(op, expr) => {
+        Expr::Number { ann, value } => Expr::Number { ann, value },
+        Expr::UnaryOp { ann, op, expr } => {
             let expr = inline_expr(context, *expr);
-            Expr::UnaryOp(op, Box::new(expr))
+            Expr::UnaryOp {
+                ann,
+                op,
+                expr: Box::new(expr),
+            }
         }
-        Expr::BinOp(lhs, op, rhs) => {
+        Expr::BinOp { ann, lhs, op, rhs } => {
             let lhs = inline_expr(context, *lhs);
             let rhs = inline_expr(context, *rhs);
-            Expr::BinOp(Box::new(lhs), op, Box::new(rhs))
+            Expr::BinOp {
+                ann,
+                lhs: Box::new(lhs),
+                op,
+                rhs: Box::new(rhs),
+            }
         }
-        Expr::Variable(name) => {
-            let maybe_existing = context.get(&name).cloned();
+        Expr::Variable { ann, value } => {
+            let maybe_existing = context.get(&value).cloned();
             let new_expr = if let Some(existing) = maybe_existing {
                 inline_expr(context, existing)
             } else {
-                return Expr::Variable(name.clone());
+                return Expr::Variable {
+                    ann,
+                    value: value.clone(),
+                };
             };
-            context.insert(name.clone(), new_expr.clone());
+            context.insert(value.clone(), new_expr.clone());
             new_expr
         }
     }
 }
 
-fn inline_decl(mut context: Context, decl: Declaration) -> Context {
+fn inline_decl<A: Clone>(mut context: Context<A>, decl: Declaration<A>) -> Context<A> {
     match decl {
-        Declaration::VarAssignment(v, expr) => {
+        Declaration::VarAssignment { binder, expr } => {
             let expr = inline_expr(&mut context, expr);
-            context.insert(v, expr);
+            context.insert(binder.var, expr);
             context
         }
-        Declaration::PublicVar(_) => context,
+        Declaration::PublicVar { .. } => context,
     }
 }
 
-pub fn inline(program: Program) -> Expr {
+pub fn inline<A: Clone>(program: Program<A>) -> Expr<A> {
     let context = Context::new();
     let Program { decls, expr } = program;
     let mut context = decls.into_iter().fold(context, inline_decl);
@@ -71,23 +83,36 @@ pub fn inline(program: Program) -> Expr {
 #[cfg(test)]
 mod inliner_tests {
     use super::*;
+    use crate::ast::declaration::Binder;
     use crate::ast::expression::*;
     use crate::ast::program::Program;
 
     #[test]
     fn inliner_basic_test() {
-        let expr1 = Expr::BinOp(
-            Box::new(Expr::Number(1)),
+        let expr1: Expr<()> = Expr::binary_op_default(
+            Expr::number_default(1),
             Opcode::Add,
-            Box::new(Expr::Number(2)),
+            Expr::number_default(2),
         );
-        let decls = vec![Declaration::VarAssignment(Ident::new("x"), expr1.clone())];
-        let expr2 = Expr::BinOp(
-            Box::new(Expr::Variable(Ident::new("x"))),
+        let decls = vec![Declaration::VarAssignment {
+            binder: Binder::default(Ident::new("x")),
+            expr: expr1.clone(),
+        }];
+        let expr2 = Expr::binary_op_default(
+            Expr::variable_default(Ident::new("x")),
             Opcode::Add,
-            Box::new(Expr::Number(3)),
+            Expr::number_default(3),
         );
-        let inlined = Expr::BinOp(Box::new(expr1), Opcode::Add, Box::new(Expr::Number(3)));
+        let inlined = Expr::binary_op_default(
+            Expr::binary_op_default(
+                Expr::number_default(1),
+                Opcode::Add,
+                Expr::number_default(2),
+            ),
+            Opcode::Add,
+            Expr::number_default(3),
+        );
+        //Expr::BinOp(Box::new(expr1), Opcode::Add, Box::new(Expr::Number(3)));
         let program = Program::new(decls, expr2).unwrap();
         assert_eq!(inline(program), inlined);
     }

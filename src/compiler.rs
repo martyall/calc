@@ -11,12 +11,12 @@ pub enum CompilerError {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct CompiledProgram {
+pub struct CompiledProgram<A> {
     pub public_vars: Vec<Ident>,
-    pub expr: Expr,
+    pub expr: Expr<A>,
 }
 
-pub fn compile(program: Program) -> Result<CompiledProgram> {
+pub fn compile<A: Clone>(program: Program<A>) -> Result<CompiledProgram<A>> {
     let public_vars: Vec<Ident> = program
         .public_variable_decls()
         .iter()
@@ -28,7 +28,7 @@ pub fn compile(program: Program) -> Result<CompiledProgram> {
 }
 
 // normal form means that every public variable appears in `expr`
-fn assert_normal_form(public_vars: Vec<Ident>, expr: &Expr) -> Result<()> {
+fn assert_normal_form<A: Clone>(public_vars: Vec<Ident>, expr: &Expr<A>) -> Result<()> {
     let public_vars: HashSet<Ident> = public_vars.into_iter().collect();
     let expr_vars: HashSet<Ident> = expr.variables().into_iter().collect();
     let unconstrained_vars: Vec<Ident> = public_vars.difference(&expr_vars).cloned().collect();

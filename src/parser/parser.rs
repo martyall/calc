@@ -1,6 +1,7 @@
 use pest_derive::Parser;
 
-use crate::ast::{Declaration, Expr, Ident, Opcode, Program, UOpcode};
+use crate::ast::annotation::{from_pest_span, Span};
+use crate::ast::{Binder, Declaration, Expr, Ident, Opcode, Program, UOpcode};
 use anyhow::Result;
 use lazy_static::lazy_static;
 use pest::error::Error;
@@ -25,33 +26,52 @@ lazy_static! {
     };
 }
 
-fn infix_rule(lhs: Expr, pair: Pair<Rule>, rhs: Expr) -> Expr {
-    match pair.as_rule() {
-        Rule::add => Expr::BinOp(Box::new(lhs), Opcode::Add, Box::new(rhs)),
-        Rule::sub => Expr::BinOp(Box::new(lhs), Opcode::Sub, Box::new(rhs)),
-        Rule::mul => Expr::BinOp(Box::new(lhs), Opcode::Mul, Box::new(rhs)),
-        Rule::pow => Expr::BinOp(Box::new(lhs), Opcode::Pow, Box::new(rhs)),
+fn infix_rule(lhs: Expr<Span>, pair: Pair<Rule>, rhs: Expr<Span>) -> Expr<Span> {
+    let op = match pair.as_rule() {
+        Rule::add => Opcode::Add,
+        Rule::sub => Opcode::Sub,
+        Rule::mul => Opcode::Mul,
+        Rule::pow => Opcode::Pow,
         rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
+    };
+    let ann = from_pest_span(pair.as_span());
+    Expr::BinOp {
+        ann,
+        lhs: Box::new(lhs),
+        op,
+        rhs: Box::new(rhs),
     }
 }
 
-fn primary_rule(pair: Pair<Rule>) -> Expr {
+fn primary_rule(pair: Pair<Rule>) -> Expr<Span> {
+    let ann = from_pest_span(pair.as_span());
     match pair.as_rule() {
-        Rule::integer => Expr::Number(pair.as_str().parse::<i32>().unwrap()),
+        Rule::integer => Expr::Number {
+            ann,
+            value: pair.as_str().parse::<i32>().unwrap(),
+        },
+        Rule::identifier => Expr::Variable {
+            ann,
+            value: Ident::new(pair.as_str()),
+        },
         Rule::expression => parse_expr(pair.into_inner()),
-        Rule::identifier => Expr::Variable(Ident::new(pair.as_str())),
         rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
     }
 }
 
-fn prefix_rule(pair: Pair<Rule>, expr: Expr) -> Expr {
+fn prefix_rule(pair: Pair<Rule>, expr: Expr<Span>) -> Expr<Span> {
+    let ann = from_pest_span(pair.as_span());
     match pair.as_rule() {
-        Rule::unary_minus => Expr::UnaryOp(UOpcode::Neg, Box::new(expr)),
+        Rule::unary_minus => Expr::UnaryOp {
+            ann,
+            op: UOpcode::Neg,
+            expr: Box::new(expr),
+        },
         rule => unreachable!("Expr::parse expected prefix operation, found {:?}", rule),
     }
 }
 
-pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
+pub fn parse_expr(pairs: Pairs<Rule>) -> Expr<Span> {
     PRATT_PARSER
         .map_primary(primary_rule)
         .map_infix(infix_rule)
@@ -59,29 +79,38 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
         .parse(pairs)
 }
 
-fn parse_assignment(pairs: Pair<Rule>) -> Declaration {
+fn parse_assignment(pairs: Pair<Rule>) -> Declaration<Span> {
     match pairs.as_rule() {
         Rule::assignment => {
             let mut pairs = pairs.into_inner();
-            let name = pairs.next().expect("Expected identifier").as_str();
+            let name_pair = pairs.next().expect("Expected identifier");
+            let binder = Binder {
+                ann: from_pest_span(name_pair.as_span()),
+                var: Ident::new(name_pair.as_str()),
+            };
             let expr = parse_expr(pairs.next().expect("Expected expression").into_inner());
-            Declaration::VarAssignment(Ident::new(name), expr)
+            Declaration::VarAssignment { binder, expr }
         }
         rule => unreachable!("Declaration::parse expected assignment, found {:?}", rule),
     }
 }
 
-fn parse_public_var(pairs: Pair<Rule>) -> Declaration {
+fn parse_public_var(pairs: Pair<Rule>) -> Declaration<Span> {
     match pairs.as_rule() {
         Rule::public_var => {
-            let name = Ident::new(pairs.into_inner().as_str());
-            Declaration::PublicVar(name)
+            let name_pair = pairs.into_inner().next().expect("Expected identifier");
+            let name = Ident::new(name_pair.as_str());
+            let binder = Binder {
+                ann: from_pest_span(name_pair.as_span()),
+                var: name,
+            };
+            Declaration::PublicVar { binder }
         }
         rule => unreachable!("Declaration::parse expected public var, found {:?}", rule),
     }
 }
 
-fn parse_decls(pairs: &mut Pairs<Rule>) -> Vec<Declaration> {
+fn parse_decls(pairs: &mut Pairs<Rule>) -> Vec<Declaration<Span>> {
     let mut declarations = Vec::new();
     while let Some(pair) = pairs.peek() {
         match pair.as_rule() {
@@ -99,7 +128,7 @@ fn parse_decls(pairs: &mut Pairs<Rule>) -> Vec<Declaration> {
     declarations
 }
 
-pub fn parse(input: &str) -> Result<Program> {
+pub fn parse(input: &str) -> Result<Program<Span>> {
     let mut pairs = CalcParser::parse(Rule::program, input)?;
     let decls_pair = pairs.next().unwrap();
     let decls = parse_decls(&mut decls_pair.into_inner());
@@ -108,7 +137,7 @@ pub fn parse(input: &str) -> Result<Program> {
     Program::new(decls, expr)
 }
 
-pub fn parse_single_expression(input: &str) -> Result<Expr, Error<Rule>> {
+pub fn parse_single_expression(input: &str) -> Result<Expr<Span>, Error<Rule>> {
     let mut pairs = CalcParser::parse(Rule::expression, input)?;
     let pair = pairs.next().unwrap();
     Ok(parse_expr(pair.into_inner()))
@@ -123,17 +152,17 @@ mod parser_tests {
     #[test]
     fn no_parens_test() {
         let input = "22 * 44 + 66";
-        let expr = parse_single_expression(input).unwrap();
+        let expr = parse_single_expression(input).unwrap().clear_annotations();
         assert_eq!(
             expr,
-            Expr::BinOp(
-                Box::new(Expr::BinOp(
-                    Box::new(Expr::Number(22)),
+            Expr::binary_op_default(
+                Expr::binary_op_default(
+                    Expr::number_default(22),
                     Opcode::Mul,
-                    Box::new(Expr::Number(44))
-                )),
+                    Expr::number_default(44)
+                ),
                 Opcode::Add,
-                Box::new(Expr::Number(66))
+                Expr::number_default(66)
             )
         );
     }
@@ -141,17 +170,17 @@ mod parser_tests {
     #[test]
     fn parens_test() {
         let input = "22 * (44 + 66)";
-        let expr = parse_single_expression(input).unwrap();
+        let expr = parse_single_expression(input).unwrap().clear_annotations();
         assert_eq!(
             expr,
-            Expr::BinOp(
-                Box::new(Expr::Number(22)),
+            Expr::binary_op_default(
+                Expr::number_default(22),
                 Opcode::Mul,
-                Box::new(Expr::BinOp(
-                    Box::new(Expr::Number(44)),
+                Expr::binary_op_default(
+                    Expr::number_default(44),
                     Opcode::Add,
-                    Box::new(Expr::Number(66))
-                ))
+                    Expr::number_default(66)
+                )
             )
         );
     }
@@ -159,13 +188,13 @@ mod parser_tests {
     #[test]
     fn unary_minus_test() {
         let input = "-22 * 44";
-        let expr = parse_single_expression(input).unwrap();
+        let expr = parse_single_expression(input).unwrap().clear_annotations();
         assert_eq!(
             expr,
-            Expr::BinOp(
-                Box::new(Expr::UnaryOp(UOpcode::Neg, Box::new(Expr::Number(22)))),
+            Expr::binary_op_default(
+                Expr::unary_op_default(UOpcode::Neg, Expr::number_default(22)),
                 Opcode::Mul,
-                Box::new(Expr::Number(44))
+                Expr::number_default(44)
             )
         );
     }
@@ -179,45 +208,50 @@ mod parser_tests {
             let b = 1 - y;
             a * b - 2
           "#;
-        let program = parse(input).unwrap();
-        assert_eq!(
-            program,
-            Program::new(
-                vec![
-                    Declaration::PublicVar(Ident::new("x")),
-                    Declaration::PublicVar(Ident::new("y")),
-                    Declaration::VarAssignment(
-                        Ident::new("a"),
-                        Expr::BinOp(
-                            Box::new(Expr::Number(22)),
-                            Opcode::Mul,
-                            Box::new(Expr::BinOp(
-                                Box::new(Expr::Variable(Ident::new("x"))),
-                                Opcode::Sub,
-                                Box::new(Expr::Variable(Ident::new("b")))
-                            ))
-                        )
-                    ),
-                    Declaration::VarAssignment(
-                        Ident::new("b"),
-                        Expr::BinOp(
-                            Box::new(Expr::Number(1)),
-                            Opcode::Sub,
-                            Box::new(Expr::Variable(Ident::new("y")))
-                        )
-                    ),
-                ],
-                Expr::BinOp(
-                    Box::new(Expr::BinOp(
-                        Box::new(Expr::Variable(Ident::new("a"))),
+        let parsed_program = parse(input)
+            .expect("Expected end of program")
+            .clear_annotations();
+        let program: Program<()> = Program::new(
+            vec![
+                Declaration::PublicVar {
+                    binder: Binder::default(Ident::new("x")),
+                },
+                Declaration::PublicVar {
+                    binder: Binder::default(Ident::new("y")),
+                },
+                Declaration::VarAssignment {
+                    binder: Binder::default(Ident::new("a")),
+                    expr: Expr::binary_op_default(
+                        Expr::number_default(22),
                         Opcode::Mul,
-                        Box::new(Expr::Variable(Ident::new("b")))
-                    )),
-                    Opcode::Sub,
-                    Box::new(Expr::Number(2))
-                )
-            )
-            .unwrap()
-        );
+                        Expr::binary_op_default(
+                            Expr::variable_default(Ident::new("x")),
+                            Opcode::Sub,
+                            Expr::variable_default(Ident::new("b")),
+                        ),
+                    ),
+                },
+                Declaration::VarAssignment {
+                    binder: Binder::default(Ident::new("b")),
+                    expr: Expr::binary_op_default(
+                        Expr::number_default(1),
+                        Opcode::Sub,
+                        Expr::variable_default(Ident::new("y")),
+                    ),
+                },
+            ],
+            Expr::binary_op_default(
+                Expr::binary_op_default(
+                    Expr::variable_default(Ident::new("a")),
+                    Opcode::Mul,
+                    Expr::variable_default(Ident::new("b")),
+                ),
+                Opcode::Sub,
+                Expr::number_default(2),
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(parsed_program, program);
     }
 }

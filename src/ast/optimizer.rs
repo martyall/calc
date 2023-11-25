@@ -1,32 +1,59 @@
 use crate::ast::expression::{Expr, Opcode, UOpcode};
 
-pub fn optimize(expr: Expr) -> Expr {
+pub fn optimize<A: Clone>(expr: Expr<A>) -> Expr<A> {
     fold_constants(expr)
 }
 
 // fold constants in the expression in the most naive way possible
-fn fold_constants(expr: Expr) -> Expr {
+fn fold_constants<A: Clone>(expr: Expr<A>) -> Expr<A> {
     match expr {
-        Expr::Number(n) => Expr::Number(n),
-        Expr::Variable(name) => Expr::Variable(name),
-        Expr::UnaryOp(op, expr) => {
+        Expr::Number { ann, value } => Expr::Number { ann, value },
+        Expr::Variable { ann, value } => Expr::Variable { ann, value },
+        Expr::UnaryOp { ann, op, expr } => {
             let expr = fold_constants(*expr);
             match (op, expr) {
-                (UOpcode::Neg, Expr::Number(n)) => Expr::Number(-n),
-                (UOpcode::Neg, expr) => Expr::UnaryOp(UOpcode::Neg, Box::new(expr)),
+                (UOpcode::Neg, Expr::Number { value: n, .. }) => Expr::Number { ann, value: -n },
+                (_, expr) => Expr::UnaryOp {
+                    ann,
+                    op,
+                    expr: Box::new(expr),
+                },
             }
         }
-        Expr::BinOp(lhs, op, rhs) => {
+        Expr::BinOp { ann, lhs, op, rhs } => {
             let lhs = fold_constants(*lhs);
             let rhs = fold_constants(*rhs);
             match (lhs, op, rhs) {
-                (Expr::Number(n1), Opcode::Add, Expr::Number(n2)) => Expr::Number(n1 + n2),
-                (Expr::Number(n1), Opcode::Sub, Expr::Number(n2)) => Expr::Number(n1 - n2),
-                (Expr::Number(n1), Opcode::Mul, Expr::Number(n2)) => Expr::Number(n1 * n2),
-                (Expr::Number(n1), Opcode::Pow, Expr::Number(n2)) => {
-                    Expr::Number(n1.pow(n2 as u32))
+                (Expr::Number { value: n1, .. }, Opcode::Add, Expr::Number { value: n2, .. }) => {
+                    Expr::Number {
+                        ann,
+                        value: n1 + n2,
+                    }
                 }
-                (lhs, op, rhs) => Expr::BinOp(Box::new(lhs), op, Box::new(rhs)),
+                (Expr::Number { value: n1, .. }, Opcode::Sub, Expr::Number { value: n2, .. }) => {
+                    Expr::Number {
+                        ann,
+                        value: n1 - n2,
+                    }
+                }
+                (Expr::Number { value: n1, .. }, Opcode::Mul, Expr::Number { value: n2, .. }) => {
+                    Expr::Number {
+                        ann,
+                        value: n1 * n2,
+                    }
+                }
+                (Expr::Number { value: n1, .. }, Opcode::Pow, Expr::Number { value: n2, .. }) => {
+                    Expr::Number {
+                        ann,
+                        value: n1.pow(n2 as u32),
+                    }
+                }
+                (lhs, op, rhs) => Expr::BinOp {
+                    ann,
+                    lhs: Box::new(lhs),
+                    op,
+                    rhs: Box::new(rhs),
+                },
             }
         }
     }
@@ -38,17 +65,19 @@ mod ast_test {
 
     #[test]
     fn const_folding_basic_test() {
-        let expr1 = Expr::BinOp(
-            Box::new(Expr::Number(1)),
+        let expr1: Expr<()> = Expr::binary_op_default(
+            Expr::number_default(1),
             Opcode::Add,
-            Box::new(Expr::Number(2)),
+            Expr::number_default(2),
         );
-        let expr2 = Expr::BinOp(
-            Box::new(Expr::Number(3)),
+
+        let expr2 = Expr::binary_op_default(
+            Expr::number_default(3),
             Opcode::Sub,
-            Box::new(Expr::Number(4)),
+            Expr::number_default(4),
         );
-        let expr = Expr::BinOp(Box::new(expr1), Opcode::Mul, Box::new(expr2));
-        assert_eq!(fold_constants(expr), Expr::Number(-3));
+
+        let expr = Expr::binary_op_default(expr1, Opcode::Mul, expr2);
+        assert_eq!(fold_constants(expr), Expr::number_default(-3));
     }
 }

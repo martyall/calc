@@ -1,5 +1,5 @@
-use super::declaration::find_declaration;
 use super::error::ASTError;
+use crate::ast::annotation::Span;
 use crate::ast::declaration::Declaration;
 use crate::ast::expression::{Expr, Ident};
 use anyhow::{anyhow, Result};
@@ -8,17 +8,30 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct Program {
-    pub decls: Vec<Declaration>,
-    pub expr: Expr,
+pub struct Program<A> {
+    pub decls: Vec<Declaration<A>>,
+    pub expr: Expr<A>,
 }
 
-impl Program {
+impl<A: Clone> Program<A> {
+    pub fn clear_annotations(self) -> Program<()> {
+        Program {
+            decls: self
+                .decls
+                .into_iter()
+                .map(|decl| decl.clear_annotations())
+                .collect(),
+            expr: self.expr.clear_annotations(),
+        }
+    }
+}
+
+impl<A: Clone> Program<A> {
     // the smart constructor returns a program which has the property that
     // declarations only contain identifiers which are bound in previous declarations.
     // this means that if you are building up a context for evaluation in order, you
     // can be sure that all the variables you need to substitute will be bound in the context.
-    pub fn new(decls: Vec<Declaration>, expr: Expr) -> Result<Self> {
+    pub fn new(decls: Vec<Declaration<A>>, expr: Expr<A>) -> Result<Self> {
         let sorted_decls = sort(decls)?;
         let mut decl_ident_set: HashSet<Ident> = HashSet::new();
         for decl in sorted_decls.clone() {
@@ -49,11 +62,11 @@ impl Program {
             expr,
         })
     }
-    pub fn public_variable_decls(&self) -> Vec<Declaration> {
+    pub fn public_variable_decls(&self) -> Vec<Declaration<A>> {
         self.decls
             .iter()
             .filter(|decl| match decl {
-                Declaration::PublicVar(_) => true,
+                Declaration::PublicVar { .. } => true,
                 _ => false,
             })
             .cloned()
@@ -63,7 +76,7 @@ impl Program {
 
 // build a dependency graph for the declarations where `y -> x` means that
 // y appears as a variable in the expression bound to x.
-fn dependency_graph(decls: &Vec<Declaration>) -> DiGraph<Ident, ()> {
+fn dependency_graph<A: Clone>(decls: &Vec<Declaration<A>>) -> DiGraph<Ident, ()> {
     let mut graph = DiGraph::<Ident, ()>::new();
     let mut ix_map = HashMap::new();
     for decl in decls {
@@ -80,9 +93,36 @@ fn dependency_graph(decls: &Vec<Declaration>) -> DiGraph<Ident, ()> {
     graph
 }
 
+// find the declaration for a given variable name
+pub fn find_declaration<A: Clone>(
+    name: Ident,
+    decls: Vec<Declaration<A>>,
+) -> Option<Declaration<A>> {
+    for decl in decls {
+        match decl {
+            Declaration::VarAssignment { binder, expr } => {
+                if binder.var == name {
+                    return Some(Declaration::VarAssignment {
+                        binder: binder.clone(),
+                        expr: expr.clone(),
+                    });
+                }
+            }
+            Declaration::PublicVar { binder } => {
+                if binder.var == name {
+                    return Some(Declaration::PublicVar {
+                        binder: binder.clone(),
+                    });
+                }
+            }
+        }
+    }
+    None
+}
+
 // sort the declarations so that all the dependencies of a declaration appear
 // before it in the list (i.e. topologically sorted).
-fn sort(decls: Vec<Declaration>) -> Result<Vec<Declaration>, ASTError> {
+fn sort<A: Clone>(decls: Vec<Declaration<A>>) -> Result<Vec<Declaration<A>>, ASTError> {
     let mut sorted = Vec::new();
     let graph = dependency_graph(&decls);
     let top_sorted = toposort(&graph, None);
@@ -112,16 +152,22 @@ fn sort(decls: Vec<Declaration>) -> Result<Vec<Declaration>, ASTError> {
 #[cfg(test)]
 mod ast_test {
     use super::*;
-    use crate::ast::error::ASTError;
+    use crate::ast::{declaration::Binder, error::ASTError};
 
     #[test]
     fn duplicate_identifier_test() {
         let ident = Ident::new("x");
-        let decls: Vec<Declaration> = vec![
-            Declaration::VarAssignment(ident.clone(), Expr::Number(1)),
-            Declaration::VarAssignment(ident.clone(), Expr::Number(2)),
+        let decls: Vec<Declaration<Span>> = vec![
+            Declaration::VarAssignment {
+                binder: Binder::default(ident.clone()),
+                expr: Expr::number_default(1),
+            },
+            Declaration::VarAssignment {
+                binder: Binder::default(ident.clone()),
+                expr: Expr::number_default(2),
+            },
         ];
-        match Program::new(decls, Expr::Number(1)) {
+        match Program::new(decls, Expr::number_default(1)) {
             Err(err) => match err.downcast_ref() {
                 Some(ASTError::DuplicateIdentifier(_)) => (),
                 _ => panic!("Expected DuplicateIdentifier error"),
@@ -132,26 +178,64 @@ mod ast_test {
 
     #[test]
     fn sort_decl_test() {
-        let decls: Vec<Declaration> = vec![
-            Declaration::PublicVar(Ident::new("p")),
-            Declaration::PublicVar(Ident::new("q")),
-            Declaration::VarAssignment(Ident::new("x"), Expr::Variable(Ident::new("y"))),
-            Declaration::VarAssignment(Ident::new("y"), Expr::Variable(Ident::new("z"))),
-            Declaration::VarAssignment(Ident::new("z"), Expr::Variable(Ident::new("a"))),
-            Declaration::VarAssignment(Ident::new("a"), Expr::Variable(Ident::new("b"))),
-            Declaration::VarAssignment(Ident::new("b"), Expr::Number(1)),
+        let decls: Vec<Declaration<Span>> = vec![
+            Declaration::PublicVar {
+                binder: Binder::default(Ident::new("p")),
+            },
+            Declaration::PublicVar {
+                binder: Binder::default(Ident::new("q")),
+            },
+            Declaration::VarAssignment {
+                binder: Binder::default(Ident::new("x")),
+                expr: Expr::variable_default(Ident::new("y")),
+            },
+            Declaration::VarAssignment {
+                binder: Binder::default(Ident::new("y")),
+                expr: Expr::variable_default(Ident::new("z")),
+            },
+            Declaration::VarAssignment {
+                binder: Binder::default(Ident::new("z")),
+                expr: Expr::variable_default(Ident::new("a")),
+            },
+            Declaration::VarAssignment {
+                binder: Binder::default(Ident::new("a")),
+                expr: Expr::variable_default(Ident::new("b")),
+            },
+            Declaration::VarAssignment {
+                binder: Binder::default(Ident::new("b")),
+                expr: Expr::number_default(1),
+            },
         ];
         let sorted = sort(decls).unwrap();
         assert_eq!(
             sorted,
             vec![
-                Declaration::PublicVar(Ident::new("p")),
-                Declaration::PublicVar(Ident::new("q")),
-                Declaration::VarAssignment(Ident::new("b"), Expr::Number(1)),
-                Declaration::VarAssignment(Ident::new("a"), Expr::Variable(Ident::new("b"))),
-                Declaration::VarAssignment(Ident::new("z"), Expr::Variable(Ident::new("a"))),
-                Declaration::VarAssignment(Ident::new("y"), Expr::Variable(Ident::new("z"))),
-                Declaration::VarAssignment(Ident::new("x"), Expr::Variable(Ident::new("y"))),
+                Declaration::PublicVar {
+                    binder: Binder::default(Ident::new("p")),
+                },
+                Declaration::PublicVar {
+                    binder: Binder::default(Ident::new("q")),
+                },
+                Declaration::VarAssignment {
+                    binder: Binder::default(Ident::new("b")),
+                    expr: Expr::number_default(1),
+                },
+                Declaration::VarAssignment {
+                    binder: Binder::default(Ident::new("a")),
+                    expr: Expr::variable_default(Ident::new("b")),
+                },
+                Declaration::VarAssignment {
+                    binder: Binder::default(Ident::new("z")),
+                    expr: Expr::variable_default(Ident::new("a")),
+                },
+                Declaration::VarAssignment {
+                    binder: Binder::default(Ident::new("y")),
+                    expr: Expr::variable_default(Ident::new("z")),
+                },
+                Declaration::VarAssignment {
+                    binder: Binder::default(Ident::new("x")),
+                    expr: Expr::variable_default(Ident::new("y")),
+                },
             ]
         );
     }

@@ -1,19 +1,17 @@
 use std::collections::HashMap;
 
-use plonky2::iop::witness::{PartialWitness, WitnessWrite};
-use plonky2::plonk::circuit_data::CircuitData;
-
 use crate::ast::Ident;
 use crate::compiler::CompiledProgram;
+use crate::plonk::circuit_builder::ProvableCircuit;
 use crate::plonk::circuit_builder::{build_circuit, from_i32};
 use crate::plonk::parameters::*;
 use anyhow::Result;
+use plonky2::iop::witness::{PartialWitness, WitnessWrite};
+use plonky2::plonk::circuit_data::CircuitData;
 
-use super::ProvableCircuit;
-
-pub fn prove(
+pub fn prove<A>(
     initital_context: HashMap<Ident, i32>,
-    program: CompiledProgram,
+    program: CompiledProgram<A>,
 ) -> Result<ProvingData> {
     let mut circuit = build_circuit(program);
     let (pw, inputs) = set_public_inputs(&mut circuit, &initital_context);

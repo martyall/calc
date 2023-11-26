@@ -7,17 +7,17 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use std::collections::HashMap;
 
-fn interpret_as_target(
+fn interpret_as_target<A>(
     context: &mut HashMap<Ident, Target>,
     builder: &mut CircuitBuilder<F, D>,
-    expr: Expr,
+    expr: Expr<A>,
 ) -> Target {
     match expr {
-        Expr::Number(n) => {
+        Expr::Number { value: n, .. } => {
             let n = from_i32(n);
             builder.constant(n)
         }
-        Expr::Variable(ident) => match context.get(&ident) {
+        Expr::Variable { value: ident, .. } => match context.get(&ident) {
             Some(target) => *target,
             None => {
                 let x = builder.add_virtual_target();
@@ -25,13 +25,13 @@ fn interpret_as_target(
                 x
             }
         },
-        Expr::UnaryOp(op, expr) => {
+        Expr::UnaryOp { op, expr, .. } => {
             let expr = interpret_as_target(context, builder, *expr);
             match op {
                 UOpcode::Neg => builder.mul_const(F::NEG_ONE, expr),
             }
         }
-        Expr::BinOp(lhs, op, rhs) => {
+        Expr::BinOp { lhs, op, rhs, .. } => {
             let lhs = interpret_as_target(context, builder, *lhs);
             let rhs = interpret_as_target(context, builder, *rhs);
             match op {
@@ -56,7 +56,7 @@ pub struct ProvableCircuit {
     pub builder: CircuitBuilder<F, D>,
 }
 
-pub fn build_circuit(program: CompiledProgram) -> ProvableCircuit {
+pub fn build_circuit<A>(program: CompiledProgram<A>) -> ProvableCircuit {
     let config = CircuitConfig::standard_recursion_config();
     let mut builder: CircuitBuilder<F, D> = CircuitBuilder::new(config);
     let mut public_inputs = HashMap::new();

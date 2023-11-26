@@ -1,43 +1,43 @@
-use crate::ast::{error::ASTError, Expr, Ident, Opcode, UOpcode};
+use crate::ast::{annotation::HasSourceLoc, error::ASTError, Expr, Ident, Opcode, UOpcode};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
-pub struct Context {
-    context: HashMap<Ident, Expr>,
+pub struct Context<A> {
+    pub context: HashMap<Ident, Expr<A>>,
 }
 
-impl Context {
+impl<A: Clone> Context<A> {
     pub fn new() -> Self {
         Context {
             context: HashMap::new(),
         }
     }
 
-    pub fn get(&self, name: &Ident) -> Option<Expr> {
+    pub fn get(&self, name: &Ident) -> Option<Expr<A>> {
         self.context.get(name).cloned()
     }
 }
 
-impl From<HashMap<Ident, i32>> for Context {
+impl<A: Clone + Default> From<HashMap<Ident, i32>> for Context<A> {
     fn from(initial_context: HashMap<Ident, i32>) -> Self {
         let context = initial_context
             .iter()
-            .map(|(k, v)| (k.clone(), Expr::Number(*v)))
+            .map(|(k, v)| (k.clone(), Expr::number_default(*v)))
             .collect();
         Context { context }
     }
 }
 
-pub fn interpret(context: &mut Context, expr: &Expr) -> Result<i32> {
+pub fn interpret<A: Clone + HasSourceLoc>(context: &mut Context<A>, expr: &Expr<A>) -> Result<i32> {
     match expr {
-        Expr::Number(n) => Ok(*n),
-        Expr::UnaryOp(op, expr) => {
+        Expr::Number { value, .. } => Ok(*value),
+        Expr::UnaryOp { op, expr, .. } => {
             let expr = interpret(context, expr)?;
             match op {
                 UOpcode::Neg => Ok(-expr),
             }
         }
-        Expr::BinOp(lhs, op, rhs) => {
+        Expr::BinOp { lhs, op, rhs, .. } => {
             let lhs = interpret(context, lhs)?;
             let rhs = interpret(context, rhs)?;
             match op {
@@ -47,9 +47,14 @@ pub fn interpret(context: &mut Context, expr: &Expr) -> Result<i32> {
                 Opcode::Pow => Ok(lhs.pow(rhs as u32)),
             }
         }
-        Expr::Variable(name) => match context.get(name) {
+        Expr::Variable { value, ann } => match context.get(value) {
             Some(expr) => interpret(context, &expr),
-            None => return Err(anyhow!(ASTError::UnboundIdentifier(name.clone()))),
+            None => {
+                return Err(anyhow!(ASTError::UnboundIdentifier(
+                    ann.source_loc(),
+                    value.clone()
+                )))
+            }
         },
     }
 }

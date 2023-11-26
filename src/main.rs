@@ -4,6 +4,7 @@ pub mod interpreter;
 pub mod parser;
 pub mod plonk;
 
+use anyhow::Result;
 use ast::Ident;
 use clap::Parser;
 use jemallocator::Jemalloc;
@@ -35,21 +36,21 @@ fn read_context(file_path: &str) -> io::Result<HashMap<Ident, i32>> {
     Ok(data)
 }
 
-fn main() {
+fn default_main() -> Result<()> {
     let args = Args::parse();
-    let mut file = File::open(args.input_file).unwrap();
+    let mut file = File::open(args.input_file)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    let program = parser::parse(&contents).unwrap();
-    let program = compiler::compile(program).unwrap();
+    let program = parser::parse(&contents)?;
+    let program = compiler::compile(program)?;
 
     if args.serialize {
-        let serialized = serde_json::to_string(&program).unwrap();
-        println!("{}", serialized);
+        let serialized = serde_json::to_string(&program)?;
+        Ok(println!("{}", serialized))
     } else {
         let initial_context = match args.context {
             None => HashMap::new(),
-            Some(ref file_path) => read_context(&file_path).unwrap_or(HashMap::new()),
+            Some(ref file_path) => read_context(&file_path).unwrap(),
         };
 
         let interpreter_result = {
@@ -82,6 +83,16 @@ fn main() {
             formatted_input
         );
         proving_data.data.verify(proof).unwrap();
-        println!("Verified!")
+        Ok(println!("Verified!"))
+    }
+}
+
+fn main() {
+    match default_main() {
+        Ok(_) => (),
+        Err(e) => {
+            println!("Error: {:?}", e);
+            std::process::exit(1);
+        }
     }
 }

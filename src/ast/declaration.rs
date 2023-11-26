@@ -80,14 +80,6 @@ impl<A: HasSourceLoc> HasSourceLoc for Declaration<A> {
 }
 
 impl<A: Clone> Declaration<A> {
-    // get the variable name bound in this declaration
-    pub fn get_identifier(&self) -> Binder<A> {
-        match self {
-            Declaration::VarAssignment { binder, .. } => binder.clone(),
-            Declaration::PublicVar { binder } => binder.clone(),
-        }
-    }
-
     pub fn clear_annotations(self) -> Declaration<()> {
         match self {
             Declaration::VarAssignment { binder, expr } => Declaration::VarAssignment {

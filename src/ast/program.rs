@@ -1,6 +1,6 @@
-use super::annotation::HasSourceLoc;
-use super::error::ASTError;
+use crate::ast::annotation::HasSourceLoc;
 use crate::ast::declaration::Declaration;
+use crate::ast::error::ASTError;
 use crate::ast::expression::{Expr, Ident};
 use anyhow::{anyhow, Result};
 use petgraph::{algo::toposort, graph::DiGraph};
@@ -46,30 +46,30 @@ impl<A: Clone + HasSourceLoc + PartialEq> Program<A> {
         // check for duplicate bindings
         let mut decls_ident_set: HashSet<Ident> = HashSet::new();
         for decl in decls.clone() {
-            let binder = decl.get_identifier();
+            let binder = decl.binder();
             if decls_ident_set.contains(&binder.var) {
                 return Err(anyhow!(ASTError::DuplicateIdentifier(
                     binder.ann.source_loc(),
                     binder.var.clone()
                 )));
             }
-            decls_ident_set.insert(binder.var);
+            decls_ident_set.insert(binder.var.clone());
         }
         // sort the declarations so that all the dependencies of a declaration appear
         // before it in the list (i.e. topologically sorted).
         let sorted_decls = sort(decls)?;
         // check that all the variables used in the expression are bound in previous declarations
-        // (i.e.) verify the assertions above
+        // (i.e. verify the assertions above)
         let mut decl_ident_set: HashSet<Ident> = HashSet::new();
         for decl in sorted_decls.clone() {
-            let binder = decl.get_identifier();
+            let binder = decl.binder();
             let vars = decl.get_dependencies();
             for (var, ann) in vars {
                 if !decl_ident_set.contains(&var) {
                     return Err(anyhow!(ASTError::UnboundIdentifier(ann.source_loc(), var)));
                 }
             }
-            decl_ident_set.insert(binder.var);
+            decl_ident_set.insert(binder.var.clone());
         }
 
         // check that the final expression only uses variables bound in the declarations
@@ -94,23 +94,22 @@ fn dependency_graph<A: Clone + PartialEq + HasSourceLoc>(
     let mut graph = DiGraph::<(Ident, A), ()>::new();
     let mut ix_map = HashMap::new();
     for decl in decls {
-        let binder = decl.get_identifier();
+        let binder = decl.binder();
         let ix = graph.add_node((binder.var.clone(), binder.ann.clone()));
-        ix_map.insert(binder.var, ix);
+        ix_map.insert(binder.var.clone(), ix);
     }
     for decl in decls {
-        let binder = decl.get_identifier();
+        let binder = decl.binder();
         for dep in decl.get_dependencies() {
             match ix_map.get(&dep.0) {
                 Some(ix) => {
                     graph.add_edge(ix.clone(), ix_map[&binder.var], ());
-                    ()
                 }
                 None => {
                     return Err(anyhow!(ASTError::UnboundIdentifier(
                         dep.1.source_loc(),
                         dep.0.clone(),
-                    )))
+                    )));
                 }
             }
         }

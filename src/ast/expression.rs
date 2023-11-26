@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::annotation::HasSourceLoc;
+use crate::ast::annotation::HasSourceLoc;
 use derive_more::Display;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]

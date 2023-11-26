@@ -25,7 +25,7 @@ pub fn compile<A: Clone + HasSourceLoc + Eq + Hash>(
     let public_vars: Vec<Binder<A>> = program
         .public_variable_decls()
         .iter()
-        .map(|decl| decl.get_identifier())
+        .map(|decl| decl.binder().clone())
         .collect();
     let expr = optimize(inline(program));
     assert_normal_form(public_vars.clone(), &expr)?;

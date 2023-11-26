@@ -112,7 +112,6 @@ mod inliner_tests {
             Opcode::Add,
             Expr::number_default(3),
         );
-        //Expr::BinOp(Box::new(expr1), Opcode::Add, Box::new(Expr::Number(3)));
         let program = Program::new(decls, expr2).unwrap();
         assert_eq!(inline(program), inlined);
     }

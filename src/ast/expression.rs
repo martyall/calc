@@ -234,7 +234,7 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
     pub fn typecheck(&self, context: &TypeContext) -> Result<Ty> {
         match self {
             Expr::Literal { value, .. } => match value {
-                Literal::Number(_) => Ok(Ty::Number),
+                Literal::Number(_) => Ok(Ty::Field),
                 Literal::Boolean(_) => Ok(Ty::Boolean),
             },
             Expr::Variable { ann, value } => match context.context.get(&value) {
@@ -248,10 +248,10 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
                 let expr_ty = expr.typecheck(context)?;
                 match op {
                     UOpcode::Neg => match expr_ty {
-                        Ty::Number => Ok(Ty::Number),
+                        Ty::Field => Ok(Ty::Field),
                         _ => Err(anyhow!(TypeError::TypeMismatch(
                             ann.source_loc(),
-                            Ty::Number,
+                            Ty::Field,
                             expr.source_loc(),
                             expr_ty,
                         ))),
@@ -264,16 +264,16 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
                 match op {
                     Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Pow => match (lhs_ty, rhs_ty)
                     {
-                        (Ty::Number, Ty::Number) => Ok(Ty::Number),
-                        (Ty::Number, _) => Err(anyhow!(TypeError::TypeMismatch(
+                        (Ty::Field, Ty::Field) => Ok(Ty::Field),
+                        (Ty::Field, _) => Err(anyhow!(TypeError::TypeMismatch(
                             ann.source_loc(),
-                            Ty::Number,
+                            Ty::Field,
                             rhs.source_loc(),
                             rhs_ty,
                         ))),
                         _ => Err(anyhow!(TypeError::TypeMismatch(
                             ann.source_loc(),
-                            Ty::Number,
+                            Ty::Field,
                             lhs.source_loc(),
                             lhs_ty,
                         ))),
@@ -291,10 +291,10 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
                 let _else_ty = _else.typecheck(context)?;
                 match cond_ty {
                     Ty::Boolean => match (_then_ty, _else_ty) {
-                        (Ty::Number, Ty::Number) => Ok(Ty::Number),
+                        (Ty::Field, Ty::Field) => Ok(Ty::Field),
                         _ => Err(anyhow!(TypeError::TypeMismatch(
                             ann.source_loc(),
-                            Ty::Number,
+                            Ty::Field,
                             _then.clone().source_loc(),
                             _then_ty,
                         ))),

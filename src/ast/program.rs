@@ -230,11 +230,11 @@ mod ast_test {
         let decls: Vec<Declaration<()>> = vec![
             Declaration::PublicVar {
                 binder: Binder::default(Ident::new("p")),
-                _type: Ty::Number,
+                _type: Ty::Field,
             },
             Declaration::PublicVar {
                 binder: Binder::default(Ident::new("q")),
-                _type: Ty::Number,
+                _type: Ty::Field,
             },
             Declaration::VarAssignment {
                 binder: Binder::default(Ident::new("x")),
@@ -263,11 +263,11 @@ mod ast_test {
             vec![
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("p")),
-                    _type: Ty::Number,
+                    _type: Ty::Field,
                 },
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("q")),
-                    _type: Ty::Number,
+                    _type: Ty::Field,
                 },
                 Declaration::VarAssignment {
                     binder: Binder::default(Ident::new("b")),

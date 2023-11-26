@@ -133,7 +133,7 @@ fn parse_type(pairs: Pairs<Rule>) -> Ty {
     let mut pairs = pairs;
     let pair = pairs.next().expect("Expected type");
     match pair.as_str() {
-        "F" => Ty::Number,
+        "F" => Ty::Field,
         "Bool" => Ty::Boolean,
         a => panic!("Expected type, got {}", a),
     }
@@ -244,7 +244,7 @@ mod parser_tests {
             vec![
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("x")),
-                    _type: Ty::Number,
+                    _type: Ty::Field,
                 },
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("y")),

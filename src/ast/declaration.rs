@@ -120,7 +120,10 @@ impl<A: Clone + HasSourceLoc> Declaration<A> {
                 context.context.insert(binder.var.clone(), expr_ty);
                 Ok(())
             }
-            Declaration::PublicVar { .. } => Ok(()),
+            Declaration::PublicVar { binder, _type } => {
+                context.context.insert(binder.var.clone(), _type.clone());
+                Ok(())
+            }
         }
     }
 }

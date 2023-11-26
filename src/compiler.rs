@@ -22,6 +22,7 @@ pub struct CompiledProgram<A> {
 pub fn compile<A: Clone + HasSourceLoc + Eq + Hash>(
     program: Program<A>,
 ) -> Result<CompiledProgram<A>> {
+    program.typecheck()?;
     let public_vars: Vec<Binder<A>> = program
         .public_variable_decls()
         .iter()

@@ -58,6 +58,18 @@ fn primary_rule(pair: Pair<Rule>) -> Expr<Span> {
             ann,
             value: Ident::new(pair.as_str()),
         },
+        Rule::if_then_else => {
+            let mut pairs = pair.into_inner();
+            let cond = parse_expr(pairs.next().expect("Expected condition").into_inner());
+            let _then = parse_expr(pairs.next().expect("Expected then").into_inner());
+            let _else = parse_expr(pairs.next().expect("Expected else").into_inner());
+            Expr::IfThenElse {
+                ann,
+                cond: Box::new(cond),
+                _then: Box::new(_then),
+                _else: Box::new(_else),
+            }
+        }
         Rule::expression => parse_expr(pair.into_inner()),
         rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
     }

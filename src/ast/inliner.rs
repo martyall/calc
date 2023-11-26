@@ -59,6 +59,22 @@ fn inline_expr<A: Clone>(context: &mut Context<A>, expr: Expr<A>) -> Expr<A> {
             context.insert(value.clone(), new_expr.clone());
             new_expr
         }
+        Expr::IfThenElse {
+            ann,
+            cond,
+            _then,
+            _else,
+        } => {
+            let cond = inline_expr(context, *cond);
+            let _then = inline_expr(context, *_then);
+            let _else = inline_expr(context, *_else);
+            Expr::IfThenElse {
+                ann,
+                cond: Box::new(cond),
+                _then: Box::new(_then),
+                _else: Box::new(_else),
+            }
+        }
     }
 }
 

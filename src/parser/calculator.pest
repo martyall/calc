@@ -16,7 +16,9 @@ bin_op = _{ add | sub | mul | pow }
     mul = { "*" }
     pow = { "^" }
 
-expression = { atom ~ (bin_op ~ atom)* }
+expression = { atom ~ (bin_op ~ atom)* | if_then_else }
+
+if_then_else = { "if" ~ expression ~ "then" ~ expression ~ "else" ~ expression }
 
 public_var = { "pub" ~ identifier ~ ";" }
 

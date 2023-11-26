@@ -97,6 +97,22 @@ fn fold_constants<A: Clone>(expr: Expr<A>) -> Expr<A> {
                 },
             }
         }
+        Expr::IfThenElse {
+            ann,
+            cond,
+            _then,
+            _else,
+        } => {
+            let cond = fold_constants(*cond);
+            let _then = fold_constants(*_then);
+            let _else = fold_constants(*_else);
+            Expr::IfThenElse {
+                ann,
+                cond: Box::new(cond),
+                _then: Box::new(_then),
+                _else: Box::new(_else),
+            }
+        }
     }
 }
 

@@ -2,7 +2,7 @@ use crate::ast::{Expr, Ident, Literal, Opcode, UOpcode};
 use crate::compiler::CompiledProgram;
 use crate::plonk::parameters::*;
 use plonky2::field::types::Field;
-use plonky2::iop::target::Target;
+use plonky2::iop::target::{BoolTarget, Target};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use std::collections::HashMap;
@@ -50,6 +50,14 @@ fn interpret_as_target<A>(
                 Opcode::Mul => builder.mul(lhs, rhs),
                 Opcode::Pow => builder.exp(lhs, rhs, 10),
             }
+        }
+        Expr::IfThenElse {
+            cond, _then, _else, ..
+        } => {
+            let cond = BoolTarget::new_unsafe(interpret_as_target(context, builder, *cond));
+            let _then = interpret_as_target(context, builder, *_then);
+            let _else = interpret_as_target(context, builder, *_else);
+            builder._if(cond, _then, _else)
         }
     }
 }

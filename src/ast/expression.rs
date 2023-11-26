@@ -63,6 +63,12 @@ pub enum Expr<A> {
         op: Opcode,
         rhs: Box<Expr<A>>,
     },
+    IfThenElse {
+        ann: A,
+        cond: Box<Expr<A>>,
+        _then: Box<Expr<A>>,
+        _else: Box<Expr<A>>,
+    },
 }
 
 impl<A: Clone> Clone for Expr<A> {
@@ -87,6 +93,17 @@ impl<A: Clone> Clone for Expr<A> {
                 lhs: Box::new((**lhs).clone()),
                 rhs: Box::new((**rhs).clone()),
             },
+            Expr::IfThenElse {
+                ann,
+                cond,
+                _then,
+                _else,
+            } => Expr::IfThenElse {
+                ann: ann.clone(),
+                cond: Box::new((**cond).clone()),
+                _then: Box::new((**_then).clone()),
+                _else: Box::new((**_else).clone()),
+            },
         }
     }
 }
@@ -105,6 +122,14 @@ impl<A> Expr<A> {
                 Opcode::Pow => format!("({} ^ {})", lhs.format(), rhs.format()),
             },
             Expr::Variable { value, .. } => value.to_string(),
+            Expr::IfThenElse {
+                cond, _then, _else, ..
+            } => format!(
+                "if {} then {} else {}",
+                cond.format(),
+                _then.format(),
+                _else.format()
+            ),
         }
     }
 }
@@ -121,6 +146,14 @@ impl<A: Clone> Expr<A> {
                 deps
             }
             Expr::Variable { value, ann } => vec![(value.clone(), ann.clone())],
+            Expr::IfThenElse {
+                cond, _then, _else, ..
+            } => {
+                let mut deps = cond.variables();
+                deps.append(&mut _then.variables());
+                deps.append(&mut _else.variables());
+                deps
+            }
         }
     }
 
@@ -139,6 +172,14 @@ impl<A: Clone> Expr<A> {
                 rhs: Box::new(rhs.clear_annotations()),
             },
             Expr::Variable { value, .. } => Expr::Variable { ann: (), value },
+            Expr::IfThenElse {
+                cond, _then, _else, ..
+            } => Expr::IfThenElse {
+                ann: (),
+                cond: Box::new(cond.clear_annotations()),
+                _then: Box::new(_then.clear_annotations()),
+                _else: Box::new(_else.clear_annotations()),
+            },
         }
     }
 }
@@ -150,6 +191,7 @@ impl<A: HasSourceLoc> HasSourceLoc for Expr<A> {
             Expr::UnaryOp { ann, .. } => ann.source_loc(),
             Expr::BinOp { ann, .. } => ann.source_loc(),
             Expr::Variable { ann, .. } => ann.source_loc(),
+            Expr::IfThenElse { ann, .. } => ann.source_loc(),
         }
     }
 }

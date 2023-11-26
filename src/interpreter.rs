@@ -124,6 +124,16 @@ pub fn interpret<A: Clone + HasSourceLoc>(
                 )))
             }
         },
+        Expr::IfThenElse {
+            cond, _then, _else, ..
+        } => {
+            let cond = interpret(context, cond)?;
+            match cond {
+                Value::Boolean(true) => interpret(context, _then),
+                Value::Boolean(false) => interpret(context, _else),
+                _ => unreachable!("Only booleans can be used as conditions"),
+            }
+        }
     }
 }
 

@@ -3,6 +3,7 @@ use crate::ast::{
 };
 use anyhow::{anyhow, Result};
 use core::ops::{Add, Mul, Neg, Sub};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub struct Context<A> {
@@ -21,19 +22,27 @@ impl<A: Clone> Context<A> {
     }
 }
 
-impl<A: Clone + Default> From<HashMap<Ident, i32>> for Context<A> {
-    fn from(initial_context: HashMap<Ident, i32>) -> Self {
+impl<A: Clone + Default> From<HashMap<Ident, Literal>> for Context<A> {
+    fn from(initial_context: HashMap<Ident, Literal>) -> Self {
         let context = initial_context
             .iter()
-            .map(|(k, v)| (k.clone(), Expr::number_default(*v)))
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    Expr::Literal {
+                        ann: A::default(),
+                        value: v.clone(),
+                    },
+                )
+            })
             .collect();
         Context { context }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Value {
-    Number(i32),
+    Field(i32),
     Boolean(bool),
 }
 
@@ -41,8 +50,8 @@ impl Neg for Value {
     type Output = Self;
     fn neg(self) -> Self {
         match self {
-            Value::Number(n) => Value::Number(-n),
-            _ => unreachable!("Only numbers can be negated"),
+            Value::Field(n) => Value::Field(-n),
+            _ => unreachable!("Only Fields can be negated"),
         }
     }
 }
@@ -51,8 +60,8 @@ impl Add for Value {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
         match (self, rhs) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs + rhs),
-            _ => unreachable!("Only numbers can be added"),
+            (Value::Field(lhs), Value::Field(rhs)) => Value::Field(lhs + rhs),
+            _ => unreachable!("Only Fields can be added"),
         }
     }
 }
@@ -61,8 +70,8 @@ impl Sub for Value {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
         match (self, rhs) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs - rhs),
-            _ => unreachable!("Only numbers can be subtracted"),
+            (Value::Field(lhs), Value::Field(rhs)) => Value::Field(lhs - rhs),
+            _ => unreachable!("Only Fields can be subtracted"),
         }
     }
 }
@@ -71,8 +80,8 @@ impl Mul for Value {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self {
         match (self, rhs) {
-            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs * rhs),
-            _ => unreachable!("Only numbers can be multiplied"),
+            (Value::Field(lhs), Value::Field(rhs)) => Value::Field(lhs * rhs),
+            _ => unreachable!("Only Fields can be multiplied"),
         }
     }
 }
@@ -80,8 +89,8 @@ impl Mul for Value {
 impl Value {
     pub fn pow(self, rhs: Value) -> Self {
         match (self, rhs) {
-            (Value::Number(n), Value::Number(m)) => Value::Number(n.pow(m as u32)),
-            _ => unreachable!("Only numbers can be raised to a power"),
+            (Value::Field(n), Value::Field(m)) => Value::Field(n.pow(m as u32)),
+            _ => unreachable!("Only Fields can be raised to a power"),
         }
     }
 }
@@ -92,9 +101,9 @@ pub fn interpret<A: Clone + HasSourceLoc>(
 ) -> Result<Value> {
     match expr {
         Expr::Literal {
-            value: Literal::Number(n),
+            value: Literal::Field(n),
             ..
-        } => Ok(Value::Number(*n)),
+        } => Ok(Value::Field(*n)),
         Expr::Literal {
             value: Literal::Boolean(b),
             ..
@@ -147,7 +156,7 @@ mod interpreter_tests {
         let input = "22 * 44 + 66";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Number(1034));
+        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Field(1034));
     }
 
     #[test]
@@ -155,7 +164,7 @@ mod interpreter_tests {
         let input = "22 * (44 + 66)";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Number(2420));
+        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Field(2420));
     }
 
     #[test]
@@ -163,6 +172,6 @@ mod interpreter_tests {
         let input = "2^4 + 1";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Number(17));
+        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Field(17));
     }
 }

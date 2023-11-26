@@ -31,9 +31,9 @@ where
 
 - `<ident_i>` is an identifier defined by the pest rule `{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" * }`
 
-- `<expr_i>` is any arithmetic expression* over numbers of type `i32`, declared public variables, and any other bound identifier. You cannot have identifiers which are mutually recursive, but the order does not matter.
+- `<expr_i>` is any arithmetic expression* over Fields of type `i32`, declared public variables, and any other bound identifier. You cannot have identifiers which are mutually recursive, but the order does not matter.
 
-- `<expr>` is any arithmetic expression* over numbers of type `i32`, any public variables, and any declared variables  .
+- `<expr>` is any arithmetic expression* over Fields of type `i32`, any public variables, and any declared variables  .
 
 
 `*` arithmetic expressions can use parentheses, unary negation, and binary operators `+,-,*` and `^` (exponentiation)

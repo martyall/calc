@@ -209,14 +209,14 @@ mod ast_test {
         let decls: Vec<Declaration<()>> = vec![
             Declaration::VarAssignment {
                 binder: Binder::default(ident.clone()),
-                expr: Expr::number_default(1),
+                expr: Expr::field_default(1),
             },
             Declaration::VarAssignment {
                 binder: Binder::default(ident.clone()),
-                expr: Expr::number_default(2),
+                expr: Expr::field_default(2),
             },
         ];
-        match Program::new(decls, Expr::number_default(1)) {
+        match Program::new(decls, Expr::field_default(1)) {
             Err(err) => match err.downcast_ref() {
                 Some(ASTError::DuplicateIdentifier(_, _)) => (),
                 _ => panic!("Expected DuplicateIdentifier error"),
@@ -254,7 +254,7 @@ mod ast_test {
             },
             Declaration::VarAssignment {
                 binder: Binder::default(Ident::new("b")),
-                expr: Expr::number_default(1),
+                expr: Expr::field_default(1),
             },
         ];
         let sorted = sort(decls).unwrap();
@@ -271,7 +271,7 @@ mod ast_test {
                 },
                 Declaration::VarAssignment {
                     binder: Binder::default(Ident::new("b")),
-                    expr: Expr::number_default(1),
+                    expr: Expr::field_default(1),
                 },
                 Declaration::VarAssignment {
                     binder: Binder::default(Ident::new("a")),

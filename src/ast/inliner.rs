@@ -105,11 +105,8 @@ mod inliner_tests {
 
     #[test]
     fn inliner_basic_test() {
-        let expr1: Expr<()> = Expr::binary_op_default(
-            Expr::number_default(1),
-            Opcode::Add,
-            Expr::number_default(2),
-        );
+        let expr1: Expr<()> =
+            Expr::binary_op_default(Expr::field_default(1), Opcode::Add, Expr::field_default(2));
         let decls = vec![Declaration::VarAssignment {
             binder: Binder::default(Ident::new("x")),
             expr: expr1.clone(),
@@ -117,16 +114,12 @@ mod inliner_tests {
         let expr2 = Expr::binary_op_default(
             Expr::variable_default(Ident::new("x")),
             Opcode::Add,
-            Expr::number_default(3),
+            Expr::field_default(3),
         );
         let inlined = Expr::binary_op_default(
-            Expr::binary_op_default(
-                Expr::number_default(1),
-                Opcode::Add,
-                Expr::number_default(2),
-            ),
+            Expr::binary_op_default(Expr::field_default(1), Opcode::Add, Expr::field_default(2)),
             Opcode::Add,
-            Expr::number_default(3),
+            Expr::field_default(3),
         );
         let program = Program::new(decls, expr2).unwrap();
         assert_eq!(inline(program), inlined);

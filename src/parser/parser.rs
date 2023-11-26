@@ -49,7 +49,7 @@ fn primary_rule(pair: Pair<Rule>) -> Expr<Span> {
     match pair.as_rule() {
         Rule::integer => Expr::Literal {
             ann,
-            value: Literal::Number(pair.as_str().parse::<i32>().unwrap()),
+            value: Literal::Field(pair.as_str().parse::<i32>().unwrap()),
         },
         Rule::bool => Expr::Literal {
             ann,
@@ -186,12 +186,12 @@ mod parser_tests {
             expr,
             Expr::binary_op_default(
                 Expr::binary_op_default(
-                    Expr::number_default(22),
+                    Expr::field_default(22),
                     Opcode::Mul,
-                    Expr::number_default(44)
+                    Expr::field_default(44)
                 ),
                 Opcode::Add,
-                Expr::number_default(66)
+                Expr::field_default(66)
             )
         );
     }
@@ -203,12 +203,12 @@ mod parser_tests {
         assert_eq!(
             expr,
             Expr::binary_op_default(
-                Expr::number_default(22),
+                Expr::field_default(22),
                 Opcode::Mul,
                 Expr::binary_op_default(
-                    Expr::number_default(44),
+                    Expr::field_default(44),
                     Opcode::Add,
-                    Expr::number_default(66)
+                    Expr::field_default(66)
                 )
             )
         );
@@ -221,9 +221,9 @@ mod parser_tests {
         assert_eq!(
             expr,
             Expr::binary_op_default(
-                Expr::unary_op_default(UOpcode::Neg, Expr::number_default(22)),
+                Expr::unary_op_default(UOpcode::Neg, Expr::field_default(22)),
                 Opcode::Mul,
-                Expr::number_default(44)
+                Expr::field_default(44)
             )
         );
     }
@@ -253,7 +253,7 @@ mod parser_tests {
                 Declaration::VarAssignment {
                     binder: Binder::default(Ident::new("a")),
                     expr: Expr::binary_op_default(
-                        Expr::number_default(22),
+                        Expr::field_default(22),
                         Opcode::Mul,
                         Expr::binary_op_default(
                             Expr::variable_default(Ident::new("x")),
@@ -265,7 +265,7 @@ mod parser_tests {
                 Declaration::VarAssignment {
                     binder: Binder::default(Ident::new("b")),
                     expr: Expr::binary_op_default(
-                        Expr::number_default(1),
+                        Expr::field_default(1),
                         Opcode::Sub,
                         Expr::variable_default(Ident::new("y")),
                     ),
@@ -278,7 +278,7 @@ mod parser_tests {
                     Expr::variable_default(Ident::new("b")),
                 ),
                 Opcode::Sub,
-                Expr::number_default(2),
+                Expr::field_default(2),
             ),
         )
         .unwrap();

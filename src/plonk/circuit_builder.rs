@@ -8,16 +8,7 @@ use plonky2::plonk::circuit_data::CircuitConfig;
 use std::collections::HashMap;
 
 fn interpret_literal_as_target(builder: &mut CircuitBuilder<F, D>, lit: Literal) -> Target {
-    match lit {
-        Literal::Number(n) => {
-            let n = from_i32(n);
-            builder.constant(n)
-        }
-        Literal::Boolean(b) => {
-            let n = if b { F::ONE } else { F::ZERO };
-            builder.constant(n)
-        }
-    }
+    builder.constant(from_literal(lit))
 }
 
 fn interpret_as_target<A>(
@@ -62,10 +53,25 @@ fn interpret_as_target<A>(
     }
 }
 
-pub fn from_i32(n: i32) -> F {
+pub fn from_literal(lit: Literal) -> F {
+    match lit {
+        Literal::Field(n) => from_i32(n),
+        Literal::Boolean(b) => from_bool(b),
+    }
+}
+
+fn from_i32(n: i32) -> F {
     let sign = if n < 0 { F::NEG_ONE } else { F::ONE };
     let n = n.abs() as u32;
     sign * F::from_canonical_u32(n)
+}
+
+fn from_bool(b: bool) -> F {
+    if b {
+        F::ONE
+    } else {
+        F::ZERO
+    }
 }
 
 pub struct ProvableCircuit {

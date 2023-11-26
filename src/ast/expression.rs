@@ -30,14 +30,14 @@ impl Ident {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum Literal {
-    Number(i32),
+    Field(i32),
     Boolean(bool),
 }
 
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Number(n) => write!(f, "{}", n),
+            Literal::Field(n) => write!(f, "{}", n),
             Literal::Boolean(b) => write!(f, "{}", b),
         }
     }
@@ -198,10 +198,17 @@ impl<A: HasSourceLoc> HasSourceLoc for Expr<A> {
 }
 
 impl<A: Default> Expr<A> {
-    pub fn number_default(value: i32) -> Self {
+    pub fn field_default(value: i32) -> Self {
         Expr::Literal {
             ann: A::default(),
-            value: Literal::Number(value),
+            value: Literal::Field(value),
+        }
+    }
+
+    pub fn bool_default(value: bool) -> Self {
+        Expr::Literal {
+            ann: A::default(),
+            value: Literal::Boolean(value),
         }
     }
 
@@ -234,7 +241,7 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
     pub fn typecheck(&self, context: &TypeContext) -> Result<Ty> {
         match self {
             Expr::Literal { value, .. } => match value {
-                Literal::Number(_) => Ok(Ty::Field),
+                Literal::Field(_) => Ok(Ty::Field),
                 Literal::Boolean(_) => Ok(Ty::Boolean),
             },
             Expr::Variable { ann, value } => match context.context.get(&value) {

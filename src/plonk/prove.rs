@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 
-use crate::ast::Ident;
+use crate::ast::{Ident, Literal};
 use crate::compiler::CompiledProgram;
 use crate::plonk::circuit_builder::ProvableCircuit;
-use crate::plonk::circuit_builder::{build_circuit, from_i32};
+use crate::plonk::circuit_builder::{build_circuit, from_literal};
 use crate::plonk::parameters::*;
 use anyhow::Result;
 use plonky2::iop::witness::{PartialWitness, WitnessWrite};
 use plonky2::plonk::circuit_data::CircuitData;
 
 pub fn prove<A>(
-    initital_context: HashMap<Ident, i32>,
+    initital_context: HashMap<Ident, Literal>,
     program: CompiledProgram<A>,
 ) -> Result<ProvingData> {
     let mut circuit = build_circuit(program);
@@ -29,7 +29,7 @@ pub struct ProvingData {
 // we declared as public inputs in the circuit.
 fn set_public_inputs(
     circuit: &mut ProvableCircuit,
-    initital_context: &HashMap<Ident, i32>,
+    initital_context: &HashMap<Ident, Literal>,
 ) -> (PartialWitness<F>, Vec<Ident>) {
     let mut pw = PartialWitness::<F>::new();
     let mut inputs = Vec::new();
@@ -38,7 +38,7 @@ fn set_public_inputs(
             Some(target) => *target,
             None => panic!("Public input {} not found in circuit", ident),
         };
-        let val = from_i32(*value);
+        let val = from_literal(*value);
         pw.set_target(target, val);
         inputs.push(ident.clone());
     }

@@ -43,6 +43,25 @@ pub enum Declaration<A> {
     PublicVar { binder: Binder<A> },
 }
 
+impl<A> Clone for Declaration<A>
+where
+    A: Clone,
+    Binder<A>: Clone,
+    Expr<A>: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Declaration::VarAssignment { binder, expr } => Declaration::VarAssignment {
+                binder: binder.clone(),
+                expr: expr.clone(),
+            },
+            Declaration::PublicVar { binder } => Declaration::PublicVar {
+                binder: binder.clone(),
+            },
+        }
+    }
+}
+
 impl<A> Declaration<A> {
     pub fn binder(&self) -> &Binder<A> {
         match self {
@@ -60,25 +79,12 @@ impl<A: HasSourceLoc> HasSourceLoc for Declaration<A> {
     }
 }
 
-impl<A: Clone + PartialEq> Declaration<A> {
+impl<A: Clone> Declaration<A> {
     // get the variable name bound in this declaration
     pub fn get_identifier(&self) -> Binder<A> {
         match self {
             Declaration::VarAssignment { binder, .. } => binder.clone(),
             Declaration::PublicVar { binder } => binder.clone(),
-        }
-    }
-
-    // get all the free variables in the expression bound in this declaration
-    // (none for public variables)
-    pub fn get_dependencies(&self) -> Vec<(Ident, A)> {
-        match self {
-            Declaration::VarAssignment { expr, .. } => {
-                let mut vars = expr.variables();
-                vars.dedup();
-                vars
-            }
-            Declaration::PublicVar { .. } => vec![],
         }
     }
 
@@ -95,21 +101,17 @@ impl<A: Clone + PartialEq> Declaration<A> {
     }
 }
 
-impl<A> Clone for Declaration<A>
-where
-    A: Clone,
-    Binder<A>: Clone,
-    Expr<A>: Clone,
-{
-    fn clone(&self) -> Self {
+impl<A: Clone + PartialEq> Declaration<A> {
+    // get all the free variables in the expression bound in this declaration
+    // (none for public variables)
+    pub fn get_dependencies(&self) -> Vec<(Ident, A)> {
         match self {
-            Declaration::VarAssignment { binder, expr } => Declaration::VarAssignment {
-                binder: binder.clone(),
-                expr: expr.clone(),
-            },
-            Declaration::PublicVar { binder } => Declaration::PublicVar {
-                binder: binder.clone(),
-            },
+            Declaration::VarAssignment { expr, .. } => {
+                let mut vars = expr.variables();
+                vars.dedup();
+                vars
+            }
+            Declaration::PublicVar { .. } => vec![],
         }
     }
 }

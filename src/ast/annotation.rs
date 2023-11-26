@@ -20,6 +20,15 @@ pub struct Span {
     pub end: SourePos,
 }
 
+impl Default for Span {
+    fn default() -> Self {
+        Span {
+            start: SourePos { line: 0, column: 0 },
+            end: SourePos { line: 0, column: 0 },
+        }
+    }
+}
+
 impl Display for Span {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.start.line == self.end.line {
@@ -51,15 +60,6 @@ impl HasSourceLoc for Span {
 }
 
 // useful for tests but otherwise meaningless
-impl Default for Span {
-    fn default() -> Self {
-        Span {
-            start: SourePos { line: 0, column: 0 },
-            end: SourePos { line: 0, column: 0 },
-        }
-    }
-}
-
 pub fn from_pest_span(span: pest::Span) -> Span {
     Span {
         start: SourePos {

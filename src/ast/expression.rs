@@ -48,21 +48,33 @@ pub enum Expr<A> {
     },
 }
 
-impl<A: Clone> Expr<A> {
-    // get all of the variables that appear in an expression
-    pub fn variables(&self) -> Vec<(Ident, A)> {
+impl<A: Clone> Clone for Expr<A> {
+    fn clone(&self) -> Self {
         match self {
-            Expr::Number { .. } => vec![],
-            Expr::UnaryOp { expr, .. } => expr.variables(),
-            Expr::BinOp { lhs, rhs, .. } => {
-                let mut deps = lhs.variables();
-                deps.append(&mut rhs.variables());
-                deps
-            }
-            Expr::Variable { value, ann } => vec![(value.clone(), ann.clone())],
+            Expr::Number { ann, value } => Expr::Number {
+                ann: ann.clone(),
+                value: *value,
+            },
+            Expr::Variable { ann, value } => Expr::Variable {
+                ann: ann.clone(),
+                value: value.clone(), // Assuming Ident implements Clone
+            },
+            Expr::UnaryOp { ann, op, expr } => Expr::UnaryOp {
+                ann: ann.clone(),
+                op: *op, // Assuming UOpcode is Clone
+                expr: Box::new((**expr).clone()),
+            },
+            Expr::BinOp { ann, lhs, op, rhs } => Expr::BinOp {
+                ann: ann.clone(),
+                op: *op, // Assuming Opcode is Clone
+                lhs: Box::new((**lhs).clone()),
+                rhs: Box::new((**rhs).clone()),
+            },
         }
     }
+}
 
+impl<A> Expr<A> {
     pub fn format(&self) -> String {
         match self {
             Expr::Number { value, .. } => value.to_string(),
@@ -76,6 +88,22 @@ impl<A: Clone> Expr<A> {
                 Opcode::Pow => format!("({} ^ {})", lhs.format(), rhs.format()),
             },
             Expr::Variable { value, .. } => value.to_string(),
+        }
+    }
+}
+
+impl<A: Clone> Expr<A> {
+    // get all of the variables that appear in an expression
+    pub fn variables(&self) -> Vec<(Ident, A)> {
+        match self {
+            Expr::Number { .. } => vec![],
+            Expr::UnaryOp { expr, .. } => expr.variables(),
+            Expr::BinOp { lhs, rhs, .. } => {
+                let mut deps = lhs.variables();
+                deps.append(&mut rhs.variables());
+                deps
+            }
+            Expr::Variable { value, ann } => vec![(value.clone(), ann.clone())],
         }
     }
 
@@ -138,32 +166,6 @@ impl<A: Default> Expr<A> {
             lhs: Box::new(lhs),
             op,
             rhs: Box::new(rhs),
-        }
-    }
-}
-
-impl<A: Clone> Clone for Expr<A> {
-    fn clone(&self) -> Self {
-        match self {
-            Expr::Number { ann, value } => Expr::Number {
-                ann: ann.clone(),
-                value: *value,
-            },
-            Expr::Variable { ann, value } => Expr::Variable {
-                ann: ann.clone(),
-                value: value.clone(), // Assuming Ident implements Clone
-            },
-            Expr::UnaryOp { ann, op, expr } => Expr::UnaryOp {
-                ann: ann.clone(),
-                op: *op, // Assuming UOpcode is Clone
-                expr: Box::new((**expr).clone()),
-            },
-            Expr::BinOp { ann, lhs, op, rhs } => Expr::BinOp {
-                ann: ann.clone(),
-                op: *op, // Assuming Opcode is Clone
-                lhs: Box::new((**lhs).clone()),
-                rhs: Box::new((**rhs).clone()),
-            },
         }
     }
 }

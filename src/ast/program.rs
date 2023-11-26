@@ -13,7 +13,7 @@ pub struct Program<A> {
     pub expr: Expr<A>,
 }
 
-impl<A: Clone + PartialEq> Program<A> {
+impl<A: Clone> Program<A> {
     pub fn clear_annotations(self) -> Program<()> {
         Program {
             decls: self
@@ -23,6 +23,17 @@ impl<A: Clone + PartialEq> Program<A> {
                 .collect(),
             expr: self.expr.clear_annotations(),
         }
+    }
+
+    pub fn public_variable_decls(&self) -> Vec<Declaration<A>> {
+        self.decls
+            .iter()
+            .filter(|decl| match decl {
+                Declaration::PublicVar { .. } => true,
+                _ => false,
+            })
+            .cloned()
+            .collect()
     }
 }
 
@@ -72,16 +83,6 @@ impl<A: Clone + HasSourceLoc + PartialEq> Program<A> {
             decls: sorted_decls,
             expr,
         })
-    }
-    pub fn public_variable_decls(&self) -> Vec<Declaration<A>> {
-        self.decls
-            .iter()
-            .filter(|decl| match decl {
-                Declaration::PublicVar { .. } => true,
-                _ => false,
-            })
-            .cloned()
-            .collect()
     }
 }
 

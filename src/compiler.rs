@@ -34,7 +34,7 @@ pub fn compile<A: Clone + HasSourceLoc + Eq + Hash>(
 }
 
 // normal form means that every public variable appears in `expr`
-fn assert_normal_form<A: Clone + Eq + Hash + HasSourceLoc>(
+fn assert_normal_form<A: Clone + HasSourceLoc>(
     public_vars: Vec<Binder<A>>,
     expr: &Expr<A>,
 ) -> Result<()> {

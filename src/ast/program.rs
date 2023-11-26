@@ -62,14 +62,13 @@ impl<A: Clone + HasSourceLoc + PartialEq> Program<A> {
         // (i.e. verify the assertions above)
         let mut decl_ident_set: HashSet<Ident> = HashSet::new();
         for decl in sorted_decls.clone() {
-            let binder = decl.binder();
             let vars = decl.get_dependencies();
             for (var, ann) in vars {
                 if !decl_ident_set.contains(&var) {
                     return Err(anyhow!(ASTError::UnboundIdentifier(ann.source_loc(), var)));
                 }
             }
-            decl_ident_set.insert(binder.var.clone());
+            decl_ident_set.insert(decl.binder().var.clone());
         }
 
         // check that the final expression only uses variables bound in the declarations
@@ -119,13 +118,13 @@ fn dependency_graph<A: Clone + PartialEq + HasSourceLoc>(
 
 // find the declaration for a given variable name
 pub fn find_declaration<A: Clone>(
-    name: Ident,
+    ident: Ident,
     decls: Vec<Declaration<A>>,
 ) -> Option<Declaration<A>> {
     for decl in decls {
         match decl {
             Declaration::VarAssignment { binder, expr } => {
-                if binder.var == name {
+                if binder.var == ident {
                     return Some(Declaration::VarAssignment {
                         binder: binder.clone(),
                         expr: expr.clone(),
@@ -133,7 +132,7 @@ pub fn find_declaration<A: Clone>(
                 }
             }
             Declaration::PublicVar { binder } => {
-                if binder.var == name {
+                if binder.var == ident {
                     return Some(Declaration::PublicVar {
                         binder: binder.clone(),
                     });
@@ -155,13 +154,13 @@ fn sort<A: Clone + HasSourceLoc + PartialEq>(
     match top_sorted {
         Ok(nodes) => {
             for node in nodes {
-                let (name, ann) = graph.node_weight(node).unwrap();
-                let decl = match find_declaration(name.clone(), decls.clone()) {
+                let (ident, ann) = graph.node_weight(node).unwrap();
+                let decl = match find_declaration(ident.clone(), decls.clone()) {
                     Some(decl) => decl,
                     None => {
                         return Err(anyhow!(ASTError::UnboundIdentifier(
                             ann.source_loc(),
-                            name.clone()
+                            ident.clone()
                         )))
                     }
                 };

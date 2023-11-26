@@ -16,7 +16,7 @@ bin_op = _{ add | sub | mul | pow }
     mul = { "*" }
     pow = { "^" }
 
-expression = { atom ~ (bin_op ~ atom)* | if_then_else }
+expression = { if_then_else | atom ~ (bin_op ~ atom)* }
 
 if_then_else = { "if" ~ expression ~ "then" ~ expression ~ "else" ~ expression }
 

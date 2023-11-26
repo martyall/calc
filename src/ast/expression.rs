@@ -125,7 +125,7 @@ impl<A> Expr<A> {
             Expr::IfThenElse {
                 cond, _then, _else, ..
             } => format!(
-                "if {} then {} else {}",
+                "(if {} then {} else {})",
                 cond.format(),
                 _then.format(),
                 _else.format()

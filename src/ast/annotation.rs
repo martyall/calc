@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone, Eq, Hash)]
@@ -6,10 +8,46 @@ pub struct SourePos {
     pub column: u32,
 }
 
+impl Display for SourePos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(line {}, column {})", self.line, self.column)
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone, Eq, Hash)]
 pub struct Span {
     pub start: SourePos,
     pub end: SourePos,
+}
+
+impl Display for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.start.line == self.end.line {
+            write!(
+                f,
+                "line {}, columns {}-{}",
+                self.start.line, self.start.column, self.end.column
+            )
+        } else {
+            write!(f, "{}-{}", self.start, self.end)
+        }
+    }
+}
+
+pub trait HasSourceLoc {
+    fn source_loc(&self) -> Span;
+}
+
+impl HasSourceLoc for () {
+    fn source_loc(&self) -> Span {
+        Span::default()
+    }
+}
+
+impl HasSourceLoc for Span {
+    fn source_loc(&self) -> Span {
+        *self
+    }
 }
 
 // useful for tests but otherwise meaningless

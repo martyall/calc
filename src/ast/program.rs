@@ -1,5 +1,5 @@
+use super::annotation::HasSourceLoc;
 use super::error::ASTError;
-use crate::ast::annotation::Span;
 use crate::ast::declaration::Declaration;
 use crate::ast::expression::{Expr, Ident};
 use anyhow::{anyhow, Result};
@@ -13,7 +13,7 @@ pub struct Program<A> {
     pub expr: Expr<A>,
 }
 
-impl<A: Clone> Program<A> {
+impl<A: Clone + PartialEq> Program<A> {
     pub fn clear_annotations(self) -> Program<()> {
         Program {
             decls: self
@@ -26,34 +26,45 @@ impl<A: Clone> Program<A> {
     }
 }
 
-impl<A: Clone> Program<A> {
+impl<A: Clone + HasSourceLoc + PartialEq> Program<A> {
     // the smart constructor returns a program which has the property that
     // declarations only contain identifiers which are bound in previous declarations.
     // this means that if you are building up a context for evaluation in order, you
     // can be sure that all the variables you need to substitute will be bound in the context.
     pub fn new(decls: Vec<Declaration<A>>, expr: Expr<A>) -> Result<Self> {
+        // check for duplicate bindings
+        let mut decls_ident_set: HashSet<Ident> = HashSet::new();
+        for decl in decls.clone() {
+            let binder = decl.get_identifier();
+            if decls_ident_set.contains(&binder.var) {
+                return Err(anyhow!(ASTError::DuplicateIdentifier(
+                    binder.ann.source_loc(),
+                    binder.var.clone()
+                )));
+            }
+            decls_ident_set.insert(binder.var);
+        }
+        // sort the declarations so that all the dependencies of a declaration appear
+        // before it in the list (i.e. topologically sorted).
         let sorted_decls = sort(decls)?;
+        // check that all the variables used in the expression are bound in previous declarations
+        // (i.e.) verify the assertions above
         let mut decl_ident_set: HashSet<Ident> = HashSet::new();
         for decl in sorted_decls.clone() {
-            let ident = decl.get_identifier();
-            // check that no variable is declared twice
-            if decl_ident_set.contains(&ident) {
-                return Err(anyhow!(ASTError::DuplicateIdentifier(ident)));
-            }
+            let binder = decl.get_identifier();
             let vars = decl.get_dependencies();
-            // check that all the variables used in the expression are bound in previous declarations
-            for var in vars {
+            for (var, ann) in vars {
                 if !decl_ident_set.contains(&var) {
-                    return Err(anyhow!(ASTError::UnboundIdentifier(var)));
+                    return Err(anyhow!(ASTError::UnboundIdentifier(ann.source_loc(), var)));
                 }
             }
-            decl_ident_set.insert(ident);
+            decl_ident_set.insert(binder.var);
         }
 
-        // check that the expression only uses variables bound in the declarations
-        for var in expr.variables() {
+        // check that the final expression only uses variables bound in the declarations
+        for (var, ann) in expr.variables() {
             if !decl_ident_set.contains(&var) {
-                return Err(anyhow!(ASTError::UnboundIdentifier(var)));
+                return Err(anyhow!(ASTError::UnboundIdentifier(ann.source_loc(), var)));
             }
         }
 
@@ -76,21 +87,34 @@ impl<A: Clone> Program<A> {
 
 // build a dependency graph for the declarations where `y -> x` means that
 // y appears as a variable in the expression bound to x.
-fn dependency_graph<A: Clone>(decls: &Vec<Declaration<A>>) -> DiGraph<Ident, ()> {
-    let mut graph = DiGraph::<Ident, ()>::new();
+fn dependency_graph<A: Clone + PartialEq + HasSourceLoc>(
+    decls: &Vec<Declaration<A>>,
+) -> Result<DiGraph<(Ident, A), ()>> {
+    let mut graph = DiGraph::<(Ident, A), ()>::new();
     let mut ix_map = HashMap::new();
     for decl in decls {
-        let var = decl.get_identifier();
-        let ix = graph.add_node(var.clone());
-        ix_map.insert(var, ix);
+        let binder = decl.get_identifier();
+        let ix = graph.add_node((binder.var.clone(), binder.ann.clone()));
+        ix_map.insert(binder.var, ix);
     }
     for decl in decls {
-        let var = decl.get_identifier();
+        let binder = decl.get_identifier();
         for dep in decl.get_dependencies() {
-            graph.add_edge(ix_map[&dep], ix_map[&var], ());
+            match ix_map.get(&dep.0) {
+                Some(ix) => {
+                    graph.add_edge(ix.clone(), ix_map[&binder.var], ());
+                    ()
+                }
+                None => {
+                    return Err(anyhow!(ASTError::UnboundIdentifier(
+                        dep.1.source_loc(),
+                        dep.0.clone(),
+                    )))
+                }
+            }
         }
     }
-    graph
+    Ok(graph)
 }
 
 // find the declaration for a given variable name
@@ -122,17 +146,24 @@ pub fn find_declaration<A: Clone>(
 
 // sort the declarations so that all the dependencies of a declaration appear
 // before it in the list (i.e. topologically sorted).
-fn sort<A: Clone>(decls: Vec<Declaration<A>>) -> Result<Vec<Declaration<A>>, ASTError> {
+fn sort<A: Clone + HasSourceLoc + PartialEq>(
+    decls: Vec<Declaration<A>>,
+) -> Result<Vec<Declaration<A>>> {
     let mut sorted = Vec::new();
-    let graph = dependency_graph(&decls);
+    let graph = dependency_graph(&decls)?;
     let top_sorted = toposort(&graph, None);
     match top_sorted {
         Ok(nodes) => {
             for node in nodes {
-                let name = graph.node_weight(node).unwrap();
+                let (name, ann) = graph.node_weight(node).unwrap();
                 let decl = match find_declaration(name.clone(), decls.clone()) {
                     Some(decl) => decl,
-                    None => return Err(ASTError::UnboundIdentifier(name.clone())),
+                    None => {
+                        return Err(anyhow!(ASTError::UnboundIdentifier(
+                            ann.source_loc(),
+                            name.clone()
+                        )))
+                    }
                 };
                 if decl.get_dependencies().is_empty() {
                     sorted.insert(0, decl)
@@ -143,8 +174,11 @@ fn sort<A: Clone>(decls: Vec<Declaration<A>>) -> Result<Vec<Declaration<A>>, AST
             Ok(sorted)
         }
         Err(cycle) => {
-            let c = graph.node_weight(cycle.node_id()).unwrap();
-            Err(ASTError::CyclicDependency(c.clone()))
+            let (c, ann) = graph.node_weight(cycle.node_id()).unwrap();
+            Err(anyhow!(ASTError::CyclicDependency(
+                ann.source_loc(),
+                c.clone()
+            )))
         }
     }
 }
@@ -157,7 +191,7 @@ mod ast_test {
     #[test]
     fn duplicate_identifier_test() {
         let ident = Ident::new("x");
-        let decls: Vec<Declaration<Span>> = vec![
+        let decls: Vec<Declaration<()>> = vec![
             Declaration::VarAssignment {
                 binder: Binder::default(ident.clone()),
                 expr: Expr::number_default(1),
@@ -169,7 +203,7 @@ mod ast_test {
         ];
         match Program::new(decls, Expr::number_default(1)) {
             Err(err) => match err.downcast_ref() {
-                Some(ASTError::DuplicateIdentifier(_)) => (),
+                Some(ASTError::DuplicateIdentifier(_, _)) => (),
                 _ => panic!("Expected DuplicateIdentifier error"),
             },
             _ => panic!("Expected DuplicateIdentifier error"),
@@ -178,7 +212,7 @@ mod ast_test {
 
     #[test]
     fn sort_decl_test() {
-        let decls: Vec<Declaration<Span>> = vec![
+        let decls: Vec<Declaration<()>> = vec![
             Declaration::PublicVar {
                 binder: Binder::default(Ident::new("p")),
             },

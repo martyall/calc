@@ -1,9 +1,9 @@
-use crate::ast::{error::ASTError, Expr, Ident, Opcode, UOpcode};
+use crate::ast::{annotation::HasSourceLoc, error::ASTError, Expr, Ident, Opcode, UOpcode};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
 pub struct Context<A> {
-    context: HashMap<Ident, Expr<A>>,
+    pub context: HashMap<Ident, Expr<A>>,
 }
 
 impl<A: Clone> Context<A> {
@@ -28,7 +28,7 @@ impl<A: Clone + Default> From<HashMap<Ident, i32>> for Context<A> {
     }
 }
 
-pub fn interpret<A: Clone>(context: &mut Context<A>, expr: &Expr<A>) -> Result<i32> {
+pub fn interpret<A: Clone + HasSourceLoc>(context: &mut Context<A>, expr: &Expr<A>) -> Result<i32> {
     match expr {
         Expr::Number { value, .. } => Ok(*value),
         Expr::UnaryOp { op, expr, .. } => {
@@ -47,9 +47,14 @@ pub fn interpret<A: Clone>(context: &mut Context<A>, expr: &Expr<A>) -> Result<i
                 Opcode::Pow => Ok(lhs.pow(rhs as u32)),
             }
         }
-        Expr::Variable { value, .. } => match context.get(value) {
+        Expr::Variable { value, ann } => match context.get(value) {
             Some(expr) => interpret(context, &expr),
-            None => return Err(anyhow!(ASTError::UnboundIdentifier(value.clone()))),
+            None => {
+                return Err(anyhow!(ASTError::UnboundIdentifier(
+                    ann.source_loc(),
+                    value.clone()
+                )))
+            }
         },
     }
 }

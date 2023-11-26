@@ -1,7 +1,8 @@
+use crate::ast::annotation::{HasSourceLoc, Span};
 use crate::ast::expression::{Expr, Ident};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Binder<A> {
     pub ann: A,
     pub var: Ident,
@@ -42,18 +43,35 @@ pub enum Declaration<A> {
     PublicVar { binder: Binder<A> },
 }
 
-impl<A: Clone> Declaration<A> {
-    // get the variable name bound in this declaration
-    pub fn get_identifier(&self) -> Ident {
+impl<A> Declaration<A> {
+    pub fn binder(&self) -> &Binder<A> {
         match self {
-            Declaration::VarAssignment { binder, .. } => binder.var.clone(),
-            Declaration::PublicVar { binder } => binder.var.clone(),
+            Declaration::VarAssignment { binder, .. } => binder,
+            Declaration::PublicVar { binder } => binder,
+        }
+    }
+}
+
+impl<A: HasSourceLoc> HasSourceLoc for Declaration<A> {
+    fn source_loc(&self) -> Span {
+        match self.binder() {
+            Binder { ann, .. } => ann.source_loc(),
+        }
+    }
+}
+
+impl<A: Clone + PartialEq> Declaration<A> {
+    // get the variable name bound in this declaration
+    pub fn get_identifier(&self) -> Binder<A> {
+        match self {
+            Declaration::VarAssignment { binder, .. } => binder.clone(),
+            Declaration::PublicVar { binder } => binder.clone(),
         }
     }
 
     // get all the free variables in the expression bound in this declaration
     // (none for public variables)
-    pub fn get_dependencies(&self) -> Vec<Ident> {
+    pub fn get_dependencies(&self) -> Vec<(Ident, A)> {
         match self {
             Declaration::VarAssignment { expr, .. } => {
                 let mut vars = expr.variables();

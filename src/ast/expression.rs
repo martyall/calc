@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+use super::annotation::HasSourceLoc;
+use derive_more::Display;
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum Opcode {
     Add,
@@ -13,22 +16,12 @@ pub enum UOpcode {
     Neg,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Deserialize, Serialize)]
-pub struct Ident {
-    pub value: String,
-}
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Deserialize, Serialize, Display)]
+pub struct Ident(String);
 
 impl Ident {
     pub fn new(s: &str) -> Self {
-        Ident {
-            value: s.to_string(),
-        }
-    }
-}
-
-impl std::fmt::Display for Ident {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", &self.value)
+        Ident(s.to_string())
     }
 }
 
@@ -57,7 +50,7 @@ pub enum Expr<A> {
 
 impl<A: Clone> Expr<A> {
     // get all of the variables that appear in an expression
-    pub fn variables(&self) -> Vec<Ident> {
+    pub fn variables(&self) -> Vec<(Ident, A)> {
         match self {
             Expr::Number { .. } => vec![],
             Expr::UnaryOp { expr, .. } => expr.variables(),
@@ -66,7 +59,7 @@ impl<A: Clone> Expr<A> {
                 deps.append(&mut rhs.variables());
                 deps
             }
-            Expr::Variable { value, .. } => vec![value.clone()],
+            Expr::Variable { value, ann } => vec![(value.clone(), ann.clone())],
         }
     }
 
@@ -82,7 +75,7 @@ impl<A: Clone> Expr<A> {
                 Opcode::Mul => format!("({} * {})", lhs.format(), rhs.format()),
                 Opcode::Pow => format!("({} ^ {})", lhs.format(), rhs.format()),
             },
-            Expr::Variable { value, .. } => value.value.clone(),
+            Expr::Variable { value, .. } => value.to_string(),
         }
     }
 
@@ -101,6 +94,17 @@ impl<A: Clone> Expr<A> {
                 rhs: Box::new(rhs.clear_annotations()),
             },
             Expr::Variable { value, .. } => Expr::Variable { ann: (), value },
+        }
+    }
+}
+
+impl<A: HasSourceLoc> HasSourceLoc for Expr<A> {
+    fn source_loc(&self) -> crate::ast::annotation::Span {
+        match self {
+            Expr::Number { ann, .. } => ann.source_loc(),
+            Expr::UnaryOp { ann, .. } => ann.source_loc(),
+            Expr::BinOp { ann, .. } => ann.source_loc(),
+            Expr::Variable { ann, .. } => ann.source_loc(),
         }
     }
 }

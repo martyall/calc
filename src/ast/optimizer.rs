@@ -1,4 +1,4 @@
-use crate::ast::expression::{Expr, Opcode, UOpcode};
+use crate::ast::expression::{Expr, Literal, Opcode, UOpcode};
 
 pub fn optimize<A: Clone>(expr: Expr<A>) -> Expr<A> {
     fold_constants(expr)
@@ -7,12 +7,21 @@ pub fn optimize<A: Clone>(expr: Expr<A>) -> Expr<A> {
 // fold constants in the expression in the most naive way possible
 fn fold_constants<A: Clone>(expr: Expr<A>) -> Expr<A> {
     match expr {
-        Expr::Number { ann, value } => Expr::Number { ann, value },
+        Expr::Literal { ann, value } => Expr::Literal { ann, value },
         Expr::Variable { ann, value } => Expr::Variable { ann, value },
         Expr::UnaryOp { ann, op, expr } => {
             let expr = fold_constants(*expr);
             match (op, expr) {
-                (UOpcode::Neg, Expr::Number { value: n, .. }) => Expr::Number { ann, value: -n },
+                (
+                    UOpcode::Neg,
+                    Expr::Literal {
+                        value: Literal::Number(n),
+                        ..
+                    },
+                ) => Expr::Literal {
+                    ann,
+                    value: Literal::Number(-n),
+                },
                 (_, expr) => Expr::UnaryOp {
                     ann,
                     op,
@@ -24,30 +33,62 @@ fn fold_constants<A: Clone>(expr: Expr<A>) -> Expr<A> {
             let lhs = fold_constants(*lhs);
             let rhs = fold_constants(*rhs);
             match (lhs, op, rhs) {
-                (Expr::Number { value: n1, .. }, Opcode::Add, Expr::Number { value: n2, .. }) => {
-                    Expr::Number {
-                        ann,
-                        value: n1 + n2,
-                    }
-                }
-                (Expr::Number { value: n1, .. }, Opcode::Sub, Expr::Number { value: n2, .. }) => {
-                    Expr::Number {
-                        ann,
-                        value: n1 - n2,
-                    }
-                }
-                (Expr::Number { value: n1, .. }, Opcode::Mul, Expr::Number { value: n2, .. }) => {
-                    Expr::Number {
-                        ann,
-                        value: n1 * n2,
-                    }
-                }
-                (Expr::Number { value: n1, .. }, Opcode::Pow, Expr::Number { value: n2, .. }) => {
-                    Expr::Number {
-                        ann,
-                        value: n1.pow(n2 as u32),
-                    }
-                }
+                (
+                    Expr::Literal {
+                        value: Literal::Number(n1),
+                        ..
+                    },
+                    Opcode::Add,
+                    Expr::Literal {
+                        value: Literal::Number(n2),
+                        ..
+                    },
+                ) => Expr::Literal {
+                    ann,
+                    value: Literal::Number(n1 + n2),
+                },
+                (
+                    Expr::Literal {
+                        value: Literal::Number(n1),
+                        ..
+                    },
+                    Opcode::Sub,
+                    Expr::Literal {
+                        value: Literal::Number(n2),
+                        ..
+                    },
+                ) => Expr::Literal {
+                    ann,
+                    value: Literal::Number(n1 - n2),
+                },
+                (
+                    Expr::Literal {
+                        value: Literal::Number(n1),
+                        ..
+                    },
+                    Opcode::Mul,
+                    Expr::Literal {
+                        value: Literal::Number(n2),
+                        ..
+                    },
+                ) => Expr::Literal {
+                    ann,
+                    value: Literal::Number(n1 * n2),
+                },
+                (
+                    Expr::Literal {
+                        value: Literal::Number(n1),
+                        ..
+                    },
+                    Opcode::Pow,
+                    Expr::Literal {
+                        value: Literal::Number(n2),
+                        ..
+                    },
+                ) => Expr::Literal {
+                    ann,
+                    value: Literal::Number(n1.pow(n2 as u32)),
+                },
                 (lhs, op, rhs) => Expr::BinOp {
                     ann,
                     lhs: Box::new(lhs),

@@ -27,7 +27,7 @@ impl<A> Context<A> {
 // inline all variables in the expression using the context.
 fn inline_expr<A: Clone>(context: &mut Context<A>, expr: Expr<A>) -> Expr<A> {
     match expr {
-        Expr::Number { ann, value } => Expr::Number { ann, value },
+        Expr::Literal { ann, value } => Expr::Literal { ann, value },
         Expr::UnaryOp { ann, op, expr } => {
             let expr = inline_expr(context, *expr);
             Expr::UnaryOp {

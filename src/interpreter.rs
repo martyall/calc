@@ -1,4 +1,6 @@
-use crate::ast::{annotation::HasSourceLoc, error::ASTError, Expr, Ident, Opcode, UOpcode};
+use crate::ast::{
+    annotation::HasSourceLoc, error::ASTError, Expr, Ident, Literal, Opcode, UOpcode,
+};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
@@ -30,7 +32,10 @@ impl<A: Clone + Default> From<HashMap<Ident, i32>> for Context<A> {
 
 pub fn interpret<A: Clone + HasSourceLoc>(context: &mut Context<A>, expr: &Expr<A>) -> Result<i32> {
     match expr {
-        Expr::Number { value, .. } => Ok(*value),
+        Expr::Literal {
+            value: Literal::Number(n),
+            ..
+        } => Ok(*n),
         Expr::UnaryOp { op, expr, .. } => {
             let expr = interpret(context, expr)?;
             match op {

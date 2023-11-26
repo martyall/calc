@@ -1,7 +1,7 @@
 use pest_derive::Parser;
 
 use crate::ast::annotation::{from_pest_span, Span};
-use crate::ast::{Binder, Declaration, Expr, Ident, Opcode, Program, UOpcode};
+use crate::ast::{Binder, Declaration, Expr, Ident, Literal, Opcode, Program, UOpcode};
 use anyhow::Result;
 use lazy_static::lazy_static;
 use pest::error::Error;
@@ -46,9 +46,9 @@ fn infix_rule(lhs: Expr<Span>, pair: Pair<Rule>, rhs: Expr<Span>) -> Expr<Span> 
 fn primary_rule(pair: Pair<Rule>) -> Expr<Span> {
     let ann = from_pest_span(pair.as_span());
     match pair.as_rule() {
-        Rule::integer => Expr::Number {
+        Rule::integer => Expr::Literal {
             ann,
-            value: pair.as_str().parse::<i32>().unwrap(),
+            value: Literal::Number(pair.as_str().parse::<i32>().unwrap()),
         },
         Rule::identifier => Expr::Variable {
             ann,

@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Ident, Opcode, UOpcode};
+use crate::ast::{Expr, Ident, Literal, Opcode, UOpcode};
 use crate::compiler::CompiledProgram;
 use crate::plonk::parameters::*;
 use plonky2::field::types::Field;
@@ -13,7 +13,10 @@ fn interpret_as_target<A>(
     expr: Expr<A>,
 ) -> Target {
     match expr {
-        Expr::Number { value: n, .. } => {
+        Expr::Literal {
+            value: Literal::Number(n),
+            ..
+        } => {
             let n = from_i32(n);
             builder.constant(n)
         }

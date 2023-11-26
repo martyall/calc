@@ -1,9 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-use serde::{Deserialize, Serialize};
-
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone, Eq, Hash)]
-pub struct SourePos {
+struct SourePos {
     pub line: u32,
     pub column: u32,
 }
@@ -16,8 +15,8 @@ impl Display for SourePos {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone, Eq, Hash)]
 pub struct Span {
-    pub start: SourePos,
-    pub end: SourePos,
+    start: SourePos,
+    end: SourePos,
 }
 
 impl Default for Span {

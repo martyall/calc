@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 use crate::ast::annotation::HasSourceLoc;
@@ -25,11 +27,24 @@ impl Ident {
     }
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
+pub enum Literal {
+    Number(i32),
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Literal::Number(n) => write!(f, "{}", n),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Expr<A> {
-    Number {
+    Literal {
         ann: A,
-        value: i32,
+        value: Literal,
     },
     Variable {
         ann: A,
@@ -51,7 +66,7 @@ pub enum Expr<A> {
 impl<A: Clone> Clone for Expr<A> {
     fn clone(&self) -> Self {
         match self {
-            Expr::Number { ann, value } => Expr::Number {
+            Expr::Literal { ann, value } => Expr::Literal {
                 ann: ann.clone(),
                 value: *value,
             },
@@ -77,7 +92,7 @@ impl<A: Clone> Clone for Expr<A> {
 impl<A> Expr<A> {
     pub fn format(&self) -> String {
         match self {
-            Expr::Number { value, .. } => value.to_string(),
+            Expr::Literal { value, .. } => value.to_string(),
             Expr::UnaryOp { op, expr, .. } => match op {
                 UOpcode::Neg => format!("-({})", expr.format()),
             },
@@ -96,7 +111,7 @@ impl<A: Clone> Expr<A> {
     // get all of the variables that appear in an expression
     pub fn variables(&self) -> Vec<(Ident, A)> {
         match self {
-            Expr::Number { .. } => vec![],
+            Expr::Literal { .. } => vec![],
             Expr::UnaryOp { expr, .. } => expr.variables(),
             Expr::BinOp { lhs, rhs, .. } => {
                 let mut deps = lhs.variables();
@@ -109,7 +124,7 @@ impl<A: Clone> Expr<A> {
 
     pub fn clear_annotations(self) -> Expr<()> {
         match self {
-            Expr::Number { value, .. } => Expr::Number { ann: (), value },
+            Expr::Literal { value, .. } => Expr::Literal { ann: (), value },
             Expr::UnaryOp { op, expr, .. } => Expr::UnaryOp {
                 ann: (),
                 op,
@@ -129,7 +144,7 @@ impl<A: Clone> Expr<A> {
 impl<A: HasSourceLoc> HasSourceLoc for Expr<A> {
     fn source_loc(&self) -> crate::ast::annotation::Span {
         match self {
-            Expr::Number { ann, .. } => ann.source_loc(),
+            Expr::Literal { ann, .. } => ann.source_loc(),
             Expr::UnaryOp { ann, .. } => ann.source_loc(),
             Expr::BinOp { ann, .. } => ann.source_loc(),
             Expr::Variable { ann, .. } => ann.source_loc(),
@@ -139,9 +154,9 @@ impl<A: HasSourceLoc> HasSourceLoc for Expr<A> {
 
 impl<A: Default> Expr<A> {
     pub fn number_default(value: i32) -> Self {
-        Expr::Number {
+        Expr::Literal {
             ann: A::default(),
-            value,
+            value: Literal::Number(value),
         }
     }
 

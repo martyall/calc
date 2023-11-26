@@ -1,0 +1,3 @@
+pub x;
+let w = false;
+true

@@ -50,6 +50,10 @@ fn primary_rule(pair: Pair<Rule>) -> Expr<Span> {
             ann,
             value: Literal::Number(pair.as_str().parse::<i32>().unwrap()),
         },
+        Rule::bool => Expr::Literal {
+            ann,
+            value: Literal::Boolean(pair.as_str().parse::<bool>().unwrap()),
+        },
         Rule::identifier => Expr::Variable {
             ann,
             value: Ident::new(pair.as_str()),

@@ -1,8 +1,10 @@
 integer = @{ ASCII_DIGIT+ }
 
+bool = { "true" | "false" }
+
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
-primary = _{ integer | identifier | "(" ~ expression ~ ")" }
+primary = _{ integer | bool | identifier | "(" ~ expression ~ ")" }
 
 unary_minus = { "-" }
 

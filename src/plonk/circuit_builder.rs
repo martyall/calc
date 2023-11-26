@@ -7,19 +7,26 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use std::collections::HashMap;
 
+fn interpret_literal_as_target(builder: &mut CircuitBuilder<F, D>, lit: Literal) -> Target {
+    match lit {
+        Literal::Number(n) => {
+            let n = from_i32(n);
+            builder.constant(n)
+        }
+        Literal::Boolean(b) => {
+            let n = if b { F::ONE } else { F::ZERO };
+            builder.constant(n)
+        }
+    }
+}
+
 fn interpret_as_target<A>(
     context: &mut HashMap<Ident, Target>,
     builder: &mut CircuitBuilder<F, D>,
     expr: Expr<A>,
 ) -> Target {
     match expr {
-        Expr::Literal {
-            value: Literal::Number(n),
-            ..
-        } => {
-            let n = from_i32(n);
-            builder.constant(n)
-        }
+        Expr::Literal { value, .. } => interpret_literal_as_target(builder, value),
         Expr::Variable { value: ident, .. } => match context.get(&ident) {
             Some(target) => *target,
             None => {

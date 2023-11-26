@@ -30,12 +30,14 @@ impl Ident {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum Literal {
     Number(i32),
+    Boolean(bool),
 }
 
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Literal::Number(n) => write!(f, "{}", n),
+            Literal::Boolean(b) => write!(f, "{}", b),
         }
     }
 }

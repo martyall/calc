@@ -2,6 +2,7 @@ use crate::ast::{
     annotation::HasSourceLoc, error::ASTError, Expr, Ident, Literal, Opcode, UOpcode,
 };
 use anyhow::{anyhow, Result};
+use core::ops::{Add, Mul, Neg, Sub};
 use std::collections::HashMap;
 
 pub struct Context<A> {
@@ -30,12 +31,74 @@ impl<A: Clone + Default> From<HashMap<Ident, i32>> for Context<A> {
     }
 }
 
-pub fn interpret<A: Clone + HasSourceLoc>(context: &mut Context<A>, expr: &Expr<A>) -> Result<i32> {
+#[derive(Debug, PartialEq, Clone)]
+pub enum Value {
+    Number(i32),
+    Boolean(bool),
+}
+
+impl Neg for Value {
+    type Output = Self;
+    fn neg(self) -> Self {
+        match self {
+            Value::Number(n) => Value::Number(-n),
+            _ => unreachable!("Only numbers can be negated"),
+        }
+    }
+}
+
+impl Add for Value {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs + rhs),
+            _ => unreachable!("Only numbers can be added"),
+        }
+    }
+}
+
+impl Sub for Value {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs - rhs),
+            _ => unreachable!("Only numbers can be subtracted"),
+        }
+    }
+}
+
+impl Mul for Value {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Number(lhs), Value::Number(rhs)) => Value::Number(lhs * rhs),
+            _ => unreachable!("Only numbers can be multiplied"),
+        }
+    }
+}
+
+impl Value {
+    pub fn pow(self, rhs: Value) -> Self {
+        match (self, rhs) {
+            (Value::Number(n), Value::Number(m)) => Value::Number(n.pow(m as u32)),
+            _ => unreachable!("Only numbers can be raised to a power"),
+        }
+    }
+}
+
+pub fn interpret<A: Clone + HasSourceLoc>(
+    context: &mut Context<A>,
+    expr: &Expr<A>,
+) -> Result<Value> {
     match expr {
         Expr::Literal {
             value: Literal::Number(n),
             ..
-        } => Ok(*n),
+        } => Ok(Value::Number(*n)),
+        Expr::Literal {
+            value: Literal::Boolean(b),
+            ..
+        } => Ok(Value::Boolean(*b)),
         Expr::UnaryOp { op, expr, .. } => {
             let expr = interpret(context, expr)?;
             match op {
@@ -49,7 +112,7 @@ pub fn interpret<A: Clone + HasSourceLoc>(context: &mut Context<A>, expr: &Expr<
                 Opcode::Add => Ok(lhs + rhs),
                 Opcode::Sub => Ok(lhs - rhs),
                 Opcode::Mul => Ok(lhs * rhs),
-                Opcode::Pow => Ok(lhs.pow(rhs as u32)),
+                Opcode::Pow => Ok(lhs.pow(rhs)),
             }
         }
         Expr::Variable { value, ann } => match context.get(value) {
@@ -74,7 +137,7 @@ mod interpreter_tests {
         let input = "22 * 44 + 66";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), 1034);
+        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Number(1034));
     }
 
     #[test]
@@ -82,7 +145,7 @@ mod interpreter_tests {
         let input = "22 * (44 + 66)";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), 2420);
+        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Number(2420));
     }
 
     #[test]
@@ -90,6 +153,6 @@ mod interpreter_tests {
         let input = "2^4 + 1";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), 17);
+        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Number(17));
     }
 }

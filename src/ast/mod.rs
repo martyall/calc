@@ -5,6 +5,7 @@ pub mod expression;
 pub mod inliner;
 pub mod optimizer;
 pub mod program;
+pub mod typechecker;
 
 pub use declaration::{Binder, Declaration};
 pub use expression::{Expr, Ident, Literal, Opcode, UOpcode};

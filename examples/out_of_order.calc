@@ -1,4 +1,4 @@
-pub p;
+pub p: F;
 let a = b;
 let b = c;
 let c = p + 1;

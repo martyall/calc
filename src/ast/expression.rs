@@ -1,9 +1,10 @@
+use crate::ast::{annotation::HasSourceLoc, typechecker::TypeError};
+use anyhow::{anyhow, Result};
+use derive_more::Display;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-use serde::{Deserialize, Serialize};
-
-use crate::ast::annotation::HasSourceLoc;
-use derive_more::Display;
+use super::typechecker::{Ty, TypeContext};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum Opcode {
@@ -225,6 +226,87 @@ impl<A: Default> Expr<A> {
             lhs: Box::new(lhs),
             op,
             rhs: Box::new(rhs),
+        }
+    }
+}
+
+impl<A: Clone + HasSourceLoc> Expr<A> {
+    pub fn typecheck(&self, context: &TypeContext) -> Result<Ty> {
+        match self {
+            Expr::Literal { value, .. } => match value {
+                Literal::Number(_) => Ok(Ty::Number),
+                Literal::Boolean(_) => Ok(Ty::Boolean),
+            },
+            Expr::Variable { ann, value } => match context.context.get(&value) {
+                Some(ty) => Ok(ty.clone()),
+                None => Err(anyhow!(TypeError::UndefinedVariable(
+                    ann.source_loc(),
+                    value.clone()
+                ))),
+            },
+            Expr::UnaryOp { ann, op, expr } => {
+                let expr_ty = expr.typecheck(context)?;
+                match op {
+                    UOpcode::Neg => match expr_ty {
+                        Ty::Number => Ok(Ty::Number),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Number,
+                            expr.source_loc(),
+                            expr_ty,
+                        ))),
+                    },
+                }
+            }
+            Expr::BinOp { ann, lhs, op, rhs } => {
+                let lhs_ty = lhs.typecheck(context)?;
+                let rhs_ty = rhs.typecheck(context)?;
+                match op {
+                    Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Pow => match (lhs_ty, rhs_ty)
+                    {
+                        (Ty::Number, Ty::Number) => Ok(Ty::Number),
+                        (Ty::Number, _) => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Number,
+                            rhs.source_loc(),
+                            rhs_ty,
+                        ))),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Number,
+                            lhs.source_loc(),
+                            lhs_ty,
+                        ))),
+                    },
+                }
+            }
+            Expr::IfThenElse {
+                ann,
+                cond,
+                _then,
+                _else,
+            } => {
+                let cond_ty = cond.typecheck(context)?;
+                let _then_ty = _then.typecheck(context)?;
+                let _else_ty = _else.typecheck(context)?;
+                match cond_ty {
+                    Ty::Boolean => match (_then_ty, _else_ty) {
+                        (Ty::Number, Ty::Number) => Ok(Ty::Number),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Number,
+                            _then.clone().source_loc(),
+                            _then_ty,
+                        ))),
+                    },
+                    _ => Err(anyhow!(TypeError::TypeMismatch(
+                        ann.source_loc(),
+                        Ty::Boolean,
+                        cond.source_loc(),
+                        cond_ty,
+                    ))),
+                }
+            }
         }
     }
 }

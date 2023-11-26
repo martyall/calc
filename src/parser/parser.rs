@@ -1,6 +1,7 @@
 use pest_derive::Parser;
 
 use crate::ast::annotation::{from_pest_span, Span};
+use crate::ast::typechecker::Ty;
 use crate::ast::{Binder, Declaration, Expr, Ident, Literal, Opcode, Program, UOpcode};
 use anyhow::Result;
 use lazy_static::lazy_static;
@@ -114,15 +115,27 @@ fn parse_assignment(pairs: Pair<Rule>) -> Declaration<Span> {
 fn parse_public_var(pairs: Pair<Rule>) -> Declaration<Span> {
     match pairs.as_rule() {
         Rule::public_var => {
-            let name_pair = pairs.into_inner().next().expect("Expected identifier");
+            let mut pairs = pairs.into_inner();
+            let name_pair = pairs.next().expect("Expected identifier");
             let name = Ident::new(name_pair.as_str());
             let binder = Binder {
                 ann: from_pest_span(name_pair.as_span()),
                 var: name,
             };
-            Declaration::PublicVar { binder }
+            let _type = parse_type(pairs);
+            Declaration::PublicVar { binder, _type }
         }
         rule => unreachable!("Declaration::parse expected public var, found {:?}", rule),
+    }
+}
+
+fn parse_type(pairs: Pairs<Rule>) -> Ty {
+    let mut pairs = pairs;
+    let pair = pairs.next().expect("Expected type");
+    match pair.as_str() {
+        "F" => Ty::Number,
+        "Bool" => Ty::Boolean,
+        a => panic!("Expected type, got {}", a),
     }
 }
 
@@ -218,8 +231,8 @@ mod parser_tests {
     #[test]
     fn program_test() {
         let input = r#"
-            pub x;
-            pub y;
+            pub x: field;
+            pub y: bool;
             let a = 22 * (x - b);
             let b = 1 - y;
             a * b - 2
@@ -231,9 +244,11 @@ mod parser_tests {
             vec![
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("x")),
+                    _type: Ty::Number,
                 },
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("y")),
+                    _type: Ty::Boolean,
                 },
                 Declaration::VarAssignment {
                     binder: Binder::default(Ident::new("a")),

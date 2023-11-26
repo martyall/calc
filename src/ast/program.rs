@@ -7,6 +7,8 @@ use petgraph::{algo::toposort, graph::DiGraph};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+use super::typechecker::TypeContext;
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Program<A> {
     pub decls: Vec<Declaration<A>>,
@@ -34,6 +36,19 @@ impl<A: Clone> Program<A> {
             })
             .cloned()
             .collect()
+    }
+}
+
+impl<A: Clone + HasSourceLoc> Program<A> {
+    pub fn typecheck(&self) -> Result<()> {
+        let mut context = TypeContext {
+            context: HashMap::new(),
+        };
+        for decl in &self.decls {
+            decl.typecheck(&mut context)?;
+        }
+        self.expr.typecheck(&context)?;
+        Ok(())
     }
 }
 
@@ -131,10 +146,11 @@ pub fn find_declaration<A: Clone>(
                     });
                 }
             }
-            Declaration::PublicVar { binder } => {
+            Declaration::PublicVar { binder, _type } => {
                 if binder.var == ident {
                     return Some(Declaration::PublicVar {
                         binder: binder.clone(),
+                        _type: _type.clone(),
                     });
                 }
             }
@@ -185,7 +201,7 @@ fn sort<A: Clone + HasSourceLoc + PartialEq>(
 #[cfg(test)]
 mod ast_test {
     use super::*;
-    use crate::ast::{declaration::Binder, error::ASTError};
+    use crate::ast::{declaration::Binder, error::ASTError, typechecker::Ty};
 
     #[test]
     fn duplicate_identifier_test() {
@@ -214,9 +230,11 @@ mod ast_test {
         let decls: Vec<Declaration<()>> = vec![
             Declaration::PublicVar {
                 binder: Binder::default(Ident::new("p")),
+                _type: Ty::Number,
             },
             Declaration::PublicVar {
                 binder: Binder::default(Ident::new("q")),
+                _type: Ty::Number,
             },
             Declaration::VarAssignment {
                 binder: Binder::default(Ident::new("x")),
@@ -245,9 +263,11 @@ mod ast_test {
             vec![
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("p")),
+                    _type: Ty::Number,
                 },
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("q")),
+                    _type: Ty::Number,
                 },
                 Declaration::VarAssignment {
                     binder: Binder::default(Ident::new("b")),

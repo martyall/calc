@@ -20,7 +20,9 @@ expression = { if_then_else | atom ~ (bin_op ~ atom)* }
 
 if_then_else = { "if" ~ expression ~ "then" ~ expression ~ "else" ~ expression }
 
-public_var = { "pub" ~ identifier ~ ";" }
+ty = { ASCII_ALPHA+ }
+
+public_var = { "pub" ~ identifier ~ ":" ~ ty ~ ";" }
 
 assignment = { "let" ~ identifier ~ "=" ~ expression ~ ";"}
 

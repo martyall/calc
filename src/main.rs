@@ -5,7 +5,7 @@ pub mod parser;
 pub mod plonk;
 
 use anyhow::Result;
-use ast::Ident;
+use ast::{Ident, Literal};
 use clap::Parser;
 use jemallocator::Jemalloc;
 use plonk::{prove, F};
@@ -30,7 +30,7 @@ struct Args {
     serialize: bool,
 }
 
-fn read_context(file_path: &str) -> io::Result<HashMap<Ident, i32>> {
+fn read_context(file_path: &str) -> io::Result<HashMap<Ident, Literal>> {
     let file = File::open(file_path)?;
     let data = serde_json::from_reader(file)?;
     Ok(data)

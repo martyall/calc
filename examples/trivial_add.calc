@@ -1,2 +1,2 @@
-pub z;
+pub z: F;
 1 + 2 * z

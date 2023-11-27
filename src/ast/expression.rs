@@ -1,9 +1,10 @@
+use crate::ast::{annotation::HasSourceLoc, typechecker::TypeError};
+use anyhow::{anyhow, Result};
+use derive_more::Display;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-use serde::{Deserialize, Serialize};
-
-use crate::ast::annotation::HasSourceLoc;
-use derive_more::Display;
+use super::typechecker::{Ty, TypeContext};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum Opcode {
@@ -11,6 +12,9 @@ pub enum Opcode {
     Sub,
     Mul,
     Pow,
+    And,
+    Or,
+    Eq,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
@@ -29,13 +33,15 @@ impl Ident {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum Literal {
-    Number(i32),
+    Boolean(bool),
+    Field(i32),
 }
 
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Number(n) => write!(f, "{}", n),
+            Literal::Field(n) => write!(f, "{}", n),
+            Literal::Boolean(b) => write!(f, "{}", b),
         }
     }
 }
@@ -61,6 +67,12 @@ pub enum Expr<A> {
         op: Opcode,
         rhs: Box<Expr<A>>,
     },
+    IfThenElse {
+        ann: A,
+        cond: Box<Expr<A>>,
+        _then: Box<Expr<A>>,
+        _else: Box<Expr<A>>,
+    },
 }
 
 impl<A: Clone> Clone for Expr<A> {
@@ -85,6 +97,17 @@ impl<A: Clone> Clone for Expr<A> {
                 lhs: Box::new((**lhs).clone()),
                 rhs: Box::new((**rhs).clone()),
             },
+            Expr::IfThenElse {
+                ann,
+                cond,
+                _then,
+                _else,
+            } => Expr::IfThenElse {
+                ann: ann.clone(),
+                cond: Box::new((**cond).clone()),
+                _then: Box::new((**_then).clone()),
+                _else: Box::new((**_else).clone()),
+            },
         }
     }
 }
@@ -101,8 +124,19 @@ impl<A> Expr<A> {
                 Opcode::Sub => format!("({} - {})", lhs.format(), rhs.format()),
                 Opcode::Mul => format!("({} * {})", lhs.format(), rhs.format()),
                 Opcode::Pow => format!("({} ^ {})", lhs.format(), rhs.format()),
+                Opcode::And => format!("({} && {})", lhs.format(), rhs.format()),
+                Opcode::Or => format!("({} || {})", lhs.format(), rhs.format()),
+                Opcode::Eq => format!("({} == {})", lhs.format(), rhs.format()),
             },
             Expr::Variable { value, .. } => value.to_string(),
+            Expr::IfThenElse {
+                cond, _then, _else, ..
+            } => format!(
+                "(if {} then {} else {})",
+                cond.format(),
+                _then.format(),
+                _else.format()
+            ),
         }
     }
 }
@@ -119,6 +153,14 @@ impl<A: Clone> Expr<A> {
                 deps
             }
             Expr::Variable { value, ann } => vec![(value.clone(), ann.clone())],
+            Expr::IfThenElse {
+                cond, _then, _else, ..
+            } => {
+                let mut deps = cond.variables();
+                deps.append(&mut _then.variables());
+                deps.append(&mut _else.variables());
+                deps
+            }
         }
     }
 
@@ -137,6 +179,14 @@ impl<A: Clone> Expr<A> {
                 rhs: Box::new(rhs.clear_annotations()),
             },
             Expr::Variable { value, .. } => Expr::Variable { ann: (), value },
+            Expr::IfThenElse {
+                cond, _then, _else, ..
+            } => Expr::IfThenElse {
+                ann: (),
+                cond: Box::new(cond.clear_annotations()),
+                _then: Box::new(_then.clear_annotations()),
+                _else: Box::new(_else.clear_annotations()),
+            },
         }
     }
 }
@@ -148,15 +198,23 @@ impl<A: HasSourceLoc> HasSourceLoc for Expr<A> {
             Expr::UnaryOp { ann, .. } => ann.source_loc(),
             Expr::BinOp { ann, .. } => ann.source_loc(),
             Expr::Variable { ann, .. } => ann.source_loc(),
+            Expr::IfThenElse { ann, .. } => ann.source_loc(),
         }
     }
 }
 
 impl<A: Default> Expr<A> {
-    pub fn number_default(value: i32) -> Self {
+    pub fn field_default(value: i32) -> Self {
         Expr::Literal {
             ann: A::default(),
-            value: Literal::Number(value),
+            value: Literal::Field(value),
+        }
+    }
+
+    pub fn bool_default(value: bool) -> Self {
+        Expr::Literal {
+            ann: A::default(),
+            value: Literal::Boolean(value),
         }
     }
 
@@ -181,6 +239,117 @@ impl<A: Default> Expr<A> {
             lhs: Box::new(lhs),
             op,
             rhs: Box::new(rhs),
+        }
+    }
+}
+
+impl<A: Clone + HasSourceLoc> Expr<A> {
+    pub fn typecheck(&self, context: &TypeContext) -> Result<Ty> {
+        match self {
+            Expr::Literal { value, .. } => match value {
+                Literal::Field(_) => Ok(Ty::Field),
+                Literal::Boolean(_) => Ok(Ty::Boolean),
+            },
+            Expr::Variable { ann, value } => match context.context.get(&value) {
+                Some(ty) => Ok(ty.clone()),
+                None => Err(anyhow!(TypeError::UndefinedVariable(
+                    ann.source_loc(),
+                    value.clone()
+                ))),
+            },
+            Expr::UnaryOp { ann, op, expr } => {
+                let expr_ty = expr.typecheck(context)?;
+                match op {
+                    UOpcode::Neg => match expr_ty {
+                        Ty::Field => Ok(Ty::Field),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Field,
+                            expr.source_loc(),
+                            expr_ty,
+                        ))),
+                    },
+                }
+            }
+            Expr::BinOp { ann, lhs, op, rhs } => {
+                let lhs_ty = lhs.typecheck(context)?;
+                let rhs_ty = rhs.typecheck(context)?;
+                match op {
+                    Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Pow => match (lhs_ty, rhs_ty)
+                    {
+                        (Ty::Field, Ty::Field) => Ok(Ty::Field),
+                        (Ty::Field, _) => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Field,
+                            rhs.source_loc(),
+                            rhs_ty,
+                        ))),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Field,
+                            lhs.source_loc(),
+                            lhs_ty,
+                        ))),
+                    },
+                    Opcode::And | Opcode::Or => match (lhs_ty, rhs_ty) {
+                        (Ty::Boolean, Ty::Boolean) => Ok(Ty::Boolean),
+                        (Ty::Boolean, _) => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Boolean,
+                            rhs.source_loc(),
+                            rhs_ty,
+                        ))),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Boolean,
+                            lhs.source_loc(),
+                            lhs_ty,
+                        ))),
+                    },
+                    Opcode::Eq => match (lhs_ty, rhs_ty) {
+                        (Ty::Field, Ty::Field) => Ok(Ty::Boolean),
+                        (Ty::Field, _) => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Field,
+                            rhs.source_loc(),
+                            rhs_ty,
+                        ))),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Field,
+                            lhs.source_loc(),
+                            lhs_ty,
+                        ))),
+                    },
+                }
+            }
+            Expr::IfThenElse {
+                ann,
+                cond,
+                _then,
+                _else,
+            } => {
+                let cond_ty = cond.typecheck(context)?;
+                let _then_ty = _then.typecheck(context)?;
+                let _else_ty = _else.typecheck(context)?;
+                match cond_ty {
+                    Ty::Boolean => match (_then_ty, _else_ty) {
+                        (Ty::Field, Ty::Field) => Ok(Ty::Field),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Field,
+                            _then.clone().source_loc(),
+                            _then_ty,
+                        ))),
+                    },
+                    _ => Err(anyhow!(TypeError::TypeMismatch(
+                        ann.source_loc(),
+                        Ty::Boolean,
+                        cond.source_loc(),
+                        cond_ty,
+                    ))),
+                }
+            }
         }
     }
 }

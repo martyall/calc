@@ -1,22 +1,31 @@
 integer = @{ ASCII_DIGIT+ }
 
+bool = { "true" | "false" }
+
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
-primary = _{ integer | identifier | "(" ~ expression ~ ")" }
+primary = _{ integer | bool | identifier | "(" ~ expression ~ ")" }
 
 unary_minus = { "-" }
 
 atom = _{ unary_minus? ~ primary }
 
-bin_op = _{ add | sub | mul | pow }
+bin_op = _{ add | sub | mul | pow | and | or | eq}
     add = { "+" }
     sub = { "-" }
     mul = { "*" }
     pow = { "^" }
+    and = { "&&" }
+    or = { "||" }
+    eq = { "==" }
 
-expression = { atom ~ (bin_op ~ atom)* }
+expression = { if_then_else | atom ~ (bin_op ~ atom)* }
 
-public_var = { "pub" ~ identifier ~ ";" }
+if_then_else = { "if" ~ expression ~ "then" ~ expression ~ "else" ~ expression }
+
+ty = { ASCII_ALPHA+ }
+
+public_var = { "pub" ~ identifier ~ ":" ~ ty ~ ";" }
 
 assignment = { "let" ~ identifier ~ "=" ~ expression ~ ";"}
 

@@ -1,5 +1,7 @@
 use crate::ast::annotation::{HasSourceLoc, Span};
 use crate::ast::expression::{Expr, Ident};
+use crate::ast::typechecker::{Ty, TypeContext};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -40,7 +42,7 @@ impl<A: Clone> Clone for Binder<A> {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Declaration<A> {
     VarAssignment { binder: Binder<A>, expr: Expr<A> },
-    PublicVar { binder: Binder<A> },
+    PublicVar { binder: Binder<A>, _type: Ty },
 }
 
 impl<A> Clone for Declaration<A>
@@ -55,8 +57,9 @@ where
                 binder: binder.clone(),
                 expr: expr.clone(),
             },
-            Declaration::PublicVar { binder } => Declaration::PublicVar {
+            Declaration::PublicVar { binder, _type } => Declaration::PublicVar {
                 binder: binder.clone(),
+                _type: _type.clone(),
             },
         }
     }
@@ -66,7 +69,7 @@ impl<A> Declaration<A> {
     pub fn binder(&self) -> &Binder<A> {
         match self {
             Declaration::VarAssignment { binder, .. } => binder,
-            Declaration::PublicVar { binder } => binder,
+            Declaration::PublicVar { binder, .. } => binder,
         }
     }
 }
@@ -86,8 +89,9 @@ impl<A: Clone> Declaration<A> {
                 binder: binder.clear_annotations(),
                 expr: expr.clear_annotations(),
             },
-            Declaration::PublicVar { binder } => Declaration::PublicVar {
+            Declaration::PublicVar { binder, _type } => Declaration::PublicVar {
                 binder: binder.clear_annotations(),
+                _type,
             },
         }
     }
@@ -104,6 +108,22 @@ impl<A: Clone + PartialEq> Declaration<A> {
                 vars
             }
             Declaration::PublicVar { .. } => vec![],
+        }
+    }
+}
+
+impl<A: Clone + HasSourceLoc> Declaration<A> {
+    pub fn typecheck(&self, context: &mut TypeContext) -> Result<()> {
+        match self {
+            Declaration::VarAssignment { binder, expr } => {
+                let expr_ty = expr.typecheck(context)?;
+                context.context.insert(binder.var.clone(), expr_ty);
+                Ok(())
+            }
+            Declaration::PublicVar { binder, _type } => {
+                context.context.insert(binder.var.clone(), _type.clone());
+                Ok(())
+            }
         }
     }
 }

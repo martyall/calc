@@ -15,12 +15,12 @@ fn fold_constants<A: Clone>(expr: Expr<A>) -> Expr<A> {
                 (
                     UOpcode::Neg,
                     Expr::Literal {
-                        value: Literal::Number(n),
+                        value: Literal::Field(n),
                         ..
                     },
                 ) => Expr::Literal {
                     ann,
-                    value: Literal::Number(-n),
+                    value: Literal::Field(-n),
                 },
                 (_, expr) => Expr::UnaryOp {
                     ann,
@@ -35,59 +35,59 @@ fn fold_constants<A: Clone>(expr: Expr<A>) -> Expr<A> {
             match (lhs, op, rhs) {
                 (
                     Expr::Literal {
-                        value: Literal::Number(n1),
+                        value: Literal::Field(n1),
                         ..
                     },
                     Opcode::Add,
                     Expr::Literal {
-                        value: Literal::Number(n2),
+                        value: Literal::Field(n2),
                         ..
                     },
                 ) => Expr::Literal {
                     ann,
-                    value: Literal::Number(n1 + n2),
+                    value: Literal::Field(n1 + n2),
                 },
                 (
                     Expr::Literal {
-                        value: Literal::Number(n1),
+                        value: Literal::Field(n1),
                         ..
                     },
                     Opcode::Sub,
                     Expr::Literal {
-                        value: Literal::Number(n2),
+                        value: Literal::Field(n2),
                         ..
                     },
                 ) => Expr::Literal {
                     ann,
-                    value: Literal::Number(n1 - n2),
+                    value: Literal::Field(n1 - n2),
                 },
                 (
                     Expr::Literal {
-                        value: Literal::Number(n1),
+                        value: Literal::Field(n1),
                         ..
                     },
                     Opcode::Mul,
                     Expr::Literal {
-                        value: Literal::Number(n2),
+                        value: Literal::Field(n2),
                         ..
                     },
                 ) => Expr::Literal {
                     ann,
-                    value: Literal::Number(n1 * n2),
+                    value: Literal::Field(n1 * n2),
                 },
                 (
                     Expr::Literal {
-                        value: Literal::Number(n1),
+                        value: Literal::Field(n1),
                         ..
                     },
                     Opcode::Pow,
                     Expr::Literal {
-                        value: Literal::Number(n2),
+                        value: Literal::Field(n2),
                         ..
                     },
                 ) => Expr::Literal {
                     ann,
-                    value: Literal::Number(n1.pow(n2 as u32)),
+                    value: Literal::Field(n1.pow(n2 as u32)),
                 },
                 (lhs, op, rhs) => Expr::BinOp {
                     ann,
@@ -95,6 +95,22 @@ fn fold_constants<A: Clone>(expr: Expr<A>) -> Expr<A> {
                     op,
                     rhs: Box::new(rhs),
                 },
+            }
+        }
+        Expr::IfThenElse {
+            ann,
+            cond,
+            _then,
+            _else,
+        } => {
+            let cond = fold_constants(*cond);
+            let _then = fold_constants(*_then);
+            let _else = fold_constants(*_else);
+            Expr::IfThenElse {
+                ann,
+                cond: Box::new(cond),
+                _then: Box::new(_then),
+                _else: Box::new(_else),
             }
         }
     }
@@ -106,19 +122,13 @@ mod ast_test {
 
     #[test]
     fn const_folding_basic_test() {
-        let expr1: Expr<()> = Expr::binary_op_default(
-            Expr::number_default(1),
-            Opcode::Add,
-            Expr::number_default(2),
-        );
+        let expr1: Expr<()> =
+            Expr::binary_op_default(Expr::field_default(1), Opcode::Add, Expr::field_default(2));
 
-        let expr2 = Expr::binary_op_default(
-            Expr::number_default(3),
-            Opcode::Sub,
-            Expr::number_default(4),
-        );
+        let expr2 =
+            Expr::binary_op_default(Expr::field_default(3), Opcode::Sub, Expr::field_default(4));
 
         let expr = Expr::binary_op_default(expr1, Opcode::Mul, expr2);
-        assert_eq!(fold_constants(expr), Expr::number_default(-3));
+        assert_eq!(fold_constants(expr), Expr::field_default(-3));
     }
 }

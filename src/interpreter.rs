@@ -2,6 +2,8 @@ use crate::ast::{
     annotation::HasSourceLoc, error::ASTError, Expr, Ident, Literal, Opcode, UOpcode,
 };
 use anyhow::{anyhow, Result};
+use core::ops::{Add, Mul, Neg, Sub};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub struct Context<A> {
@@ -20,22 +22,104 @@ impl<A: Clone> Context<A> {
     }
 }
 
-impl<A: Clone + Default> From<HashMap<Ident, i32>> for Context<A> {
-    fn from(initial_context: HashMap<Ident, i32>) -> Self {
+impl<A: Clone + Default> From<HashMap<Ident, Literal>> for Context<A> {
+    fn from(initial_context: HashMap<Ident, Literal>) -> Self {
         let context = initial_context
             .iter()
-            .map(|(k, v)| (k.clone(), Expr::number_default(*v)))
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    Expr::Literal {
+                        ann: A::default(),
+                        value: v.clone(),
+                    },
+                )
+            })
             .collect();
         Context { context }
     }
 }
 
-pub fn interpret<A: Clone + HasSourceLoc>(context: &mut Context<A>, expr: &Expr<A>) -> Result<i32> {
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum Value {
+    Field(i32),
+    Boolean(bool),
+}
+
+impl Neg for Value {
+    type Output = Self;
+    fn neg(self) -> Self {
+        match self {
+            Value::Field(n) => Value::Field(-n),
+            _ => unreachable!("Only Fields can be negated"),
+        }
+    }
+}
+
+impl Add for Value {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Field(lhs), Value::Field(rhs)) => Value::Field(lhs + rhs),
+            _ => unreachable!("Only Fields can be added"),
+        }
+    }
+}
+
+impl Sub for Value {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Field(lhs), Value::Field(rhs)) => Value::Field(lhs - rhs),
+            _ => unreachable!("Only Fields can be subtracted"),
+        }
+    }
+}
+
+impl Mul for Value {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Field(lhs), Value::Field(rhs)) => Value::Field(lhs * rhs),
+            _ => unreachable!("Only Fields can be multiplied"),
+        }
+    }
+}
+
+impl Value {
+    pub fn pow(self, rhs: Value) -> Self {
+        match (self, rhs) {
+            (Value::Field(n), Value::Field(m)) => Value::Field(n.pow(m as u32)),
+            _ => unreachable!("Only Fields can be raised to a power"),
+        }
+    }
+    fn and(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Boolean(lhs), Value::Boolean(rhs)) => Value::Boolean(lhs && rhs),
+            _ => unreachable!("Only Booleans can be and-ed"),
+        }
+    }
+    fn or(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Boolean(lhs), Value::Boolean(rhs)) => Value::Boolean(lhs || rhs),
+            _ => unreachable!("Only Booleans can be or-ed"),
+        }
+    }
+}
+
+pub fn interpret<A: Clone + HasSourceLoc>(
+    context: &mut Context<A>,
+    expr: &Expr<A>,
+) -> Result<Value> {
     match expr {
         Expr::Literal {
-            value: Literal::Number(n),
+            value: Literal::Field(n),
             ..
-        } => Ok(*n),
+        } => Ok(Value::Field(*n)),
+        Expr::Literal {
+            value: Literal::Boolean(b),
+            ..
+        } => Ok(Value::Boolean(*b)),
         Expr::UnaryOp { op, expr, .. } => {
             let expr = interpret(context, expr)?;
             match op {
@@ -49,7 +133,10 @@ pub fn interpret<A: Clone + HasSourceLoc>(context: &mut Context<A>, expr: &Expr<
                 Opcode::Add => Ok(lhs + rhs),
                 Opcode::Sub => Ok(lhs - rhs),
                 Opcode::Mul => Ok(lhs * rhs),
-                Opcode::Pow => Ok(lhs.pow(rhs as u32)),
+                Opcode::Pow => Ok(lhs.pow(rhs)),
+                Opcode::And => Ok(lhs.and(rhs)),
+                Opcode::Or => Ok(lhs.or(rhs)),
+                Opcode::Eq => Ok(Value::Boolean(lhs == rhs)),
             }
         }
         Expr::Variable { value, ann } => match context.get(value) {
@@ -61,6 +148,16 @@ pub fn interpret<A: Clone + HasSourceLoc>(context: &mut Context<A>, expr: &Expr<
                 )))
             }
         },
+        Expr::IfThenElse {
+            cond, _then, _else, ..
+        } => {
+            let cond = interpret(context, cond)?;
+            match cond {
+                Value::Boolean(true) => interpret(context, _then),
+                Value::Boolean(false) => interpret(context, _else),
+                _ => unreachable!("Only booleans can be used as conditions"),
+            }
+        }
     }
 }
 
@@ -74,7 +171,7 @@ mod interpreter_tests {
         let input = "22 * 44 + 66";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), 1034);
+        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Field(1034));
     }
 
     #[test]
@@ -82,7 +179,7 @@ mod interpreter_tests {
         let input = "22 * (44 + 66)";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), 2420);
+        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Field(2420));
     }
 
     #[test]
@@ -90,6 +187,6 @@ mod interpreter_tests {
         let input = "2^4 + 1";
         let expr = parser::parse_single_expression(input).unwrap();
         let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), 17);
+        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Field(17));
     }
 }

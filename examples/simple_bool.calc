@@ -1,0 +1,7 @@
+pub x: F;
+pub y: F;
+let f = x^2  + 2*x + 1 - y;
+let g = x + 7 - y;
+if (f == 0 && g == 0) 
+  then 42 
+  else 0

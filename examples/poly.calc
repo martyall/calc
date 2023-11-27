@@ -1,5 +1,5 @@
-pub x;
-pub y;
+pub x: F;
+pub y: F;
 let w = v^2 + 1;
 let v = y * x + 2;
 -w + v^2 + 1

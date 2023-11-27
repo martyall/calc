@@ -1,6 +1,7 @@
 use pest_derive::Parser;
 
 use crate::ast::annotation::{from_pest_span, Span};
+use crate::ast::typechecker::Ty;
 use crate::ast::{Binder, Declaration, Expr, Ident, Literal, Opcode, Program, UOpcode};
 use anyhow::Result;
 use lazy_static::lazy_static;
@@ -19,10 +20,11 @@ lazy_static! {
         use Rule::*;
 
         PrattParser::new()
-            .op(Op::infix(add, Left) | Op::infix(sub, Left))
-            .op(Op::infix(mul, Left))
+            .op(Op::infix(add, Left) | Op::infix(sub, Left) | Op::infix(or, Left))
+            .op(Op::infix(mul, Left) | Op::infix(and, Left))
             .op(Op::prefix(unary_minus))
             .op(Op::infix(pow, Right))
+            .op(Op::infix(eq, Left))
     };
 }
 
@@ -32,6 +34,9 @@ fn infix_rule(lhs: Expr<Span>, pair: Pair<Rule>, rhs: Expr<Span>) -> Expr<Span> 
         Rule::sub => Opcode::Sub,
         Rule::mul => Opcode::Mul,
         Rule::pow => Opcode::Pow,
+        Rule::and => Opcode::And,
+        Rule::or => Opcode::Or,
+        Rule::eq => Opcode::Eq,
         rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
     };
     let ann = from_pest_span(pair.as_span());
@@ -48,12 +53,28 @@ fn primary_rule(pair: Pair<Rule>) -> Expr<Span> {
     match pair.as_rule() {
         Rule::integer => Expr::Literal {
             ann,
-            value: Literal::Number(pair.as_str().parse::<i32>().unwrap()),
+            value: Literal::Field(pair.as_str().parse::<i32>().unwrap()),
+        },
+        Rule::bool => Expr::Literal {
+            ann,
+            value: Literal::Boolean(pair.as_str().parse::<bool>().unwrap()),
         },
         Rule::identifier => Expr::Variable {
             ann,
             value: Ident::new(pair.as_str()),
         },
+        Rule::if_then_else => {
+            let mut pairs = pair.into_inner();
+            let cond = parse_expr(pairs.next().expect("Expected condition").into_inner());
+            let _then = parse_expr(pairs.next().expect("Expected then").into_inner());
+            let _else = parse_expr(pairs.next().expect("Expected else").into_inner());
+            Expr::IfThenElse {
+                ann,
+                cond: Box::new(cond),
+                _then: Box::new(_then),
+                _else: Box::new(_else),
+            }
+        }
         Rule::expression => parse_expr(pair.into_inner()),
         rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
     }
@@ -98,15 +119,27 @@ fn parse_assignment(pairs: Pair<Rule>) -> Declaration<Span> {
 fn parse_public_var(pairs: Pair<Rule>) -> Declaration<Span> {
     match pairs.as_rule() {
         Rule::public_var => {
-            let name_pair = pairs.into_inner().next().expect("Expected identifier");
+            let mut pairs = pairs.into_inner();
+            let name_pair = pairs.next().expect("Expected identifier");
             let name = Ident::new(name_pair.as_str());
             let binder = Binder {
                 ann: from_pest_span(name_pair.as_span()),
                 var: name,
             };
-            Declaration::PublicVar { binder }
+            let _type = parse_type(pairs);
+            Declaration::PublicVar { binder, _type }
         }
         rule => unreachable!("Declaration::parse expected public var, found {:?}", rule),
+    }
+}
+
+fn parse_type(pairs: Pairs<Rule>) -> Ty {
+    let mut pairs = pairs;
+    let pair = pairs.next().expect("Expected type");
+    match pair.as_str() {
+        "F" => Ty::Field,
+        "Bool" => Ty::Boolean,
+        a => panic!("Expected type, got {}", a),
     }
 }
 
@@ -157,12 +190,12 @@ mod parser_tests {
             expr,
             Expr::binary_op_default(
                 Expr::binary_op_default(
-                    Expr::number_default(22),
+                    Expr::field_default(22),
                     Opcode::Mul,
-                    Expr::number_default(44)
+                    Expr::field_default(44)
                 ),
                 Opcode::Add,
-                Expr::number_default(66)
+                Expr::field_default(66)
             )
         );
     }
@@ -174,12 +207,12 @@ mod parser_tests {
         assert_eq!(
             expr,
             Expr::binary_op_default(
-                Expr::number_default(22),
+                Expr::field_default(22),
                 Opcode::Mul,
                 Expr::binary_op_default(
-                    Expr::number_default(44),
+                    Expr::field_default(44),
                     Opcode::Add,
-                    Expr::number_default(66)
+                    Expr::field_default(66)
                 )
             )
         );
@@ -192,9 +225,9 @@ mod parser_tests {
         assert_eq!(
             expr,
             Expr::binary_op_default(
-                Expr::unary_op_default(UOpcode::Neg, Expr::number_default(22)),
+                Expr::unary_op_default(UOpcode::Neg, Expr::field_default(22)),
                 Opcode::Mul,
-                Expr::number_default(44)
+                Expr::field_default(44)
             )
         );
     }
@@ -202,8 +235,8 @@ mod parser_tests {
     #[test]
     fn program_test() {
         let input = r#"
-            pub x;
-            pub y;
+            pub x: F;
+            pub y: Bool;
             let a = 22 * (x - b);
             let b = 1 - y;
             a * b - 2
@@ -215,14 +248,16 @@ mod parser_tests {
             vec![
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("x")),
+                    _type: Ty::Field,
                 },
                 Declaration::PublicVar {
                     binder: Binder::default(Ident::new("y")),
+                    _type: Ty::Boolean,
                 },
                 Declaration::VarAssignment {
                     binder: Binder::default(Ident::new("a")),
                     expr: Expr::binary_op_default(
-                        Expr::number_default(22),
+                        Expr::field_default(22),
                         Opcode::Mul,
                         Expr::binary_op_default(
                             Expr::variable_default(Ident::new("x")),
@@ -234,7 +269,7 @@ mod parser_tests {
                 Declaration::VarAssignment {
                     binder: Binder::default(Ident::new("b")),
                     expr: Expr::binary_op_default(
-                        Expr::number_default(1),
+                        Expr::field_default(1),
                         Opcode::Sub,
                         Expr::variable_default(Ident::new("y")),
                     ),
@@ -247,7 +282,7 @@ mod parser_tests {
                     Expr::variable_default(Ident::new("b")),
                 ),
                 Opcode::Sub,
-                Expr::number_default(2),
+                Expr::field_default(2),
             ),
         )
         .unwrap();

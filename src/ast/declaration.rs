@@ -1,6 +1,6 @@
-use super::typechecker::{Ty, TypeContext};
 use crate::ast::annotation::{HasSourceLoc, Span};
 use crate::ast::expression::{Expr, Ident};
+use crate::ast::typechecker::{Ty, TypeContext};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 

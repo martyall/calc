@@ -12,3 +12,4 @@ pub use expression::{Expr, Ident, Literal, Opcode, UOpcode};
 pub use inliner::inline;
 pub use optimizer::optimize;
 pub use program::Program;
+pub use typechecker::{Ty, TypeContext};

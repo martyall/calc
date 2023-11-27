@@ -2,12 +2,11 @@ use crate::ast::annotation::HasSourceLoc;
 use crate::ast::declaration::Declaration;
 use crate::ast::error::ASTError;
 use crate::ast::expression::{Expr, Ident};
+use crate::ast::typechecker::TypeContext;
 use anyhow::{anyhow, Result};
 use petgraph::{algo::toposort, graph::DiGraph};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-
-use super::typechecker::TypeContext;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Program<A> {

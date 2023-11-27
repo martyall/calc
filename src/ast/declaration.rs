@@ -4,26 +4,58 @@ use crate::ast::typechecker::{Ty, TypeContext};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub struct Binder<A> {
-    pub ann: A,
-    pub var: Ident,
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Binder<A> {
+    VarBinder { ann: A, var: Ident },
+    TypedBinder { ann: A, var: Ident, _type: Ty },
 }
 
 impl<A> Binder<A> {
     pub fn clear_annotations(self) -> Binder<()> {
-        Binder {
-            ann: (),
-            var: self.var,
+        match self {
+            Binder::VarBinder { var, .. } => Binder::VarBinder { ann: (), var },
+            Binder::TypedBinder { var, _type, .. } => Binder::TypedBinder {
+                ann: (),
+                var,
+                _type,
+            },
+        }
+    }
+    pub fn var(&self) -> &Ident {
+        match self {
+            Binder::VarBinder { var, .. } => var,
+            Binder::TypedBinder { var, .. } => var,
+        }
+    }
+    pub fn ann(&self) -> &A {
+        match self {
+            Binder::VarBinder { ann, .. } => ann,
+            Binder::TypedBinder { ann, .. } => ann,
         }
     }
 }
 
 impl<A: Default> Binder<A> {
-    pub fn default(ident: Ident) -> Self {
-        Binder {
-            ann: A::default(),
-            var: ident,
+    pub fn default(ident: Ident, ty: Option<Ty>) -> Self {
+        match ty {
+            Some(ty) => Binder::TypedBinder {
+                ann: A::default(),
+                var: ident,
+                _type: ty,
+            },
+            None => Binder::VarBinder {
+                ann: A::default(),
+                var: ident,
+            },
+        }
+    }
+}
+
+impl<A: HasSourceLoc> HasSourceLoc for Binder<A> {
+    fn source_loc(&self) -> Span {
+        match self {
+            Binder::VarBinder { ann, .. } => ann.source_loc(),
+            Binder::TypedBinder { ann, .. } => ann.source_loc(),
         }
     }
 }
@@ -31,9 +63,14 @@ impl<A: Default> Binder<A> {
 impl<A: Clone> Clone for Binder<A> {
     fn clone(&self) -> Self {
         match self {
-            Binder { ann, var } => Binder {
+            Binder::VarBinder { ann, var } => Binder::VarBinder {
                 ann: ann.clone(),
                 var: var.clone(),
+            },
+            Binder::TypedBinder { ann, var, _type } => Binder::TypedBinder {
+                ann: ann.clone(),
+                var: var.clone(),
+                _type: _type.clone(),
             },
         }
     }
@@ -42,7 +79,7 @@ impl<A: Clone> Clone for Binder<A> {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Declaration<A> {
     VarAssignment { binder: Binder<A>, expr: Expr<A> },
-    PublicVar { binder: Binder<A>, _type: Ty },
+    PublicVar { binder: Binder<A> },
 }
 
 impl<A> Clone for Declaration<A>
@@ -57,9 +94,8 @@ where
                 binder: binder.clone(),
                 expr: expr.clone(),
             },
-            Declaration::PublicVar { binder, _type } => Declaration::PublicVar {
+            Declaration::PublicVar { binder } => Declaration::PublicVar {
                 binder: binder.clone(),
-                _type: _type.clone(),
             },
         }
     }
@@ -77,7 +113,8 @@ impl<A> Declaration<A> {
 impl<A: HasSourceLoc> HasSourceLoc for Declaration<A> {
     fn source_loc(&self) -> Span {
         match self.binder() {
-            Binder { ann, .. } => ann.source_loc(),
+            Binder::VarBinder { ann, .. } => ann.source_loc(),
+            Binder::TypedBinder { ann, .. } => ann.source_loc(),
         }
     }
 }
@@ -89,9 +126,8 @@ impl<A: Clone> Declaration<A> {
                 binder: binder.clear_annotations(),
                 expr: expr.clear_annotations(),
             },
-            Declaration::PublicVar { binder, _type } => Declaration::PublicVar {
+            Declaration::PublicVar { binder } => Declaration::PublicVar {
                 binder: binder.clear_annotations(),
-                _type,
             },
         }
     }
@@ -117,13 +153,16 @@ impl<A: Clone + HasSourceLoc> Declaration<A> {
         match self {
             Declaration::VarAssignment { binder, expr } => {
                 let expr_ty = expr.typecheck(context)?;
-                context.context.insert(binder.var.clone(), expr_ty);
+                context.context.insert(binder.var().clone(), expr_ty);
                 Ok(())
             }
-            Declaration::PublicVar { binder, _type } => {
-                context.context.insert(binder.var.clone(), _type.clone());
-                Ok(())
-            }
+            Declaration::PublicVar { binder } => match binder {
+                Binder::TypedBinder { var, _type, .. } => {
+                    context.context.insert(var.clone(), _type.clone());
+                    Ok(())
+                }
+                _ => Ok(()),
+            },
         }
     }
 }

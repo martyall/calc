@@ -82,7 +82,7 @@ fn inline_decl<A: Clone>(mut context: Context<A>, decl: Declaration<A>) -> Conte
     match decl {
         Declaration::VarAssignment { binder, expr } => {
             let expr = inline_expr(&mut context, expr);
-            context.insert(binder.var, expr);
+            context.insert(binder.var().clone(), expr);
             context
         }
         Declaration::PublicVar { .. } => context,
@@ -108,7 +108,7 @@ mod inliner_tests {
         let expr1: Expr<()> =
             Expr::binary_op_default(Expr::field_default(1), Opcode::Add, Expr::field_default(2));
         let decls = vec![Declaration::VarAssignment {
-            binder: Binder::default(Ident::new("x")),
+            binder: Binder::default(Ident::new("x"), None),
             expr: expr1.clone(),
         }];
         let expr2 = Expr::binary_op_default(

@@ -105,7 +105,7 @@ fn parse_assignment(pairs: Pair<Rule>) -> Declaration<Span> {
         Rule::assignment => {
             let mut pairs = pairs.into_inner();
             let name_pair = pairs.next().expect("Expected identifier");
-            let binder = Binder {
+            let binder = Binder::VarBinder {
                 ann: from_pest_span(name_pair.as_span()),
                 var: Ident::new(name_pair.as_str()),
             };
@@ -119,17 +119,32 @@ fn parse_assignment(pairs: Pair<Rule>) -> Declaration<Span> {
 fn parse_public_var(pairs: Pair<Rule>) -> Declaration<Span> {
     match pairs.as_rule() {
         Rule::public_var => {
+            let pairs = pairs
+                .into_inner()
+                .next()
+                .expect("expected typed_identifier");
+            let binder = parse_typed_binder(pairs);
+            Declaration::PublicVar { binder }
+        }
+        rule => unreachable!("Declaration::parse expected public var, found {:?}", rule),
+    }
+}
+
+fn parse_typed_binder(pairs: Pair<Rule>) -> Binder<Span> {
+    match pairs.as_rule() {
+        Rule::typed_identifier => {
             let mut pairs = pairs.into_inner();
             let name_pair = pairs.next().expect("Expected identifier");
             let name = Ident::new(name_pair.as_str());
-            let binder = Binder {
-                ann: from_pest_span(name_pair.as_span()),
-                var: name,
-            };
+            let ann = from_pest_span(name_pair.as_span());
             let _type = parse_type(pairs);
-            Declaration::PublicVar { binder, _type }
+            Binder::TypedBinder {
+                ann,
+                var: name,
+                _type,
+            }
         }
-        rule => unreachable!("Declaration::parse expected public var, found {:?}", rule),
+        rule => unreachable!("Declaration::parse expected typed binder, found {:?}", rule),
     }
 }
 
@@ -247,15 +262,13 @@ mod parser_tests {
         let program: Program<()> = Program::new(
             vec![
                 Declaration::PublicVar {
-                    binder: Binder::default(Ident::new("x")),
-                    _type: Ty::Field,
+                    binder: Binder::default(Ident::new("x"), Some(Ty::Field)),
                 },
                 Declaration::PublicVar {
-                    binder: Binder::default(Ident::new("y")),
-                    _type: Ty::Boolean,
+                    binder: Binder::default(Ident::new("y"), Some(Ty::Boolean)),
                 },
                 Declaration::VarAssignment {
-                    binder: Binder::default(Ident::new("a")),
+                    binder: Binder::default(Ident::new("a"), None),
                     expr: Expr::binary_op_default(
                         Expr::field_default(22),
                         Opcode::Mul,
@@ -267,7 +280,7 @@ mod parser_tests {
                     ),
                 },
                 Declaration::VarAssignment {
-                    binder: Binder::default(Ident::new("b")),
+                    binder: Binder::default(Ident::new("b"), None),
                     expr: Expr::binary_op_default(
                         Expr::field_default(1),
                         Opcode::Sub,

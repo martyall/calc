@@ -25,7 +25,9 @@ if_then_else = { "if" ~ expression ~ "then" ~ expression ~ "else" ~ expression }
 
 ty = { ASCII_ALPHA+ }
 
-public_var = { "pub" ~ identifier ~ ":" ~ ty ~ ";" }
+typed_identifier = { identifier ~ ":" ~ ty }
+
+public_var = { "pub" ~ typed_identifier ~ ";" }
 
 assignment = { "let" ~ identifier ~ "=" ~ expression ~ ";"}
 

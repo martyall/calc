@@ -10,11 +10,14 @@ unary_minus = { "-" }
 
 atom = _{ unary_minus? ~ primary }
 
-bin_op = _{ add | sub | mul | pow }
+bin_op = _{ add | sub | mul | pow | and | or | eq}
     add = { "+" }
     sub = { "-" }
     mul = { "*" }
     pow = { "^" }
+    and = { "&&" }
+    or = { "||" }
+    eq = { "==" }
 
 expression = { if_then_else | atom ~ (bin_op ~ atom)* }
 

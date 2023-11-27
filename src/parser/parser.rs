@@ -20,10 +20,11 @@ lazy_static! {
         use Rule::*;
 
         PrattParser::new()
-            .op(Op::infix(add, Left) | Op::infix(sub, Left))
-            .op(Op::infix(mul, Left))
+            .op(Op::infix(add, Left) | Op::infix(sub, Left) | Op::infix(or, Left))
+            .op(Op::infix(mul, Left) | Op::infix(and, Left))
             .op(Op::prefix(unary_minus))
             .op(Op::infix(pow, Right))
+            .op(Op::infix(eq, Left))
     };
 }
 
@@ -33,6 +34,9 @@ fn infix_rule(lhs: Expr<Span>, pair: Pair<Rule>, rhs: Expr<Span>) -> Expr<Span> 
         Rule::sub => Opcode::Sub,
         Rule::mul => Opcode::Mul,
         Rule::pow => Opcode::Pow,
+        Rule::and => Opcode::And,
+        Rule::or => Opcode::Or,
+        Rule::eq => Opcode::Eq,
         rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
     };
     let ann = from_pest_span(pair.as_span());

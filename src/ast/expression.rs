@@ -12,6 +12,9 @@ pub enum Opcode {
     Sub,
     Mul,
     Pow,
+    And,
+    Or,
+    Eq,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
@@ -30,8 +33,8 @@ impl Ident {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum Literal {
-    Field(i32),
     Boolean(bool),
+    Field(i32),
 }
 
 impl Display for Literal {
@@ -121,6 +124,9 @@ impl<A> Expr<A> {
                 Opcode::Sub => format!("({} - {})", lhs.format(), rhs.format()),
                 Opcode::Mul => format!("({} * {})", lhs.format(), rhs.format()),
                 Opcode::Pow => format!("({} ^ {})", lhs.format(), rhs.format()),
+                Opcode::And => format!("({} && {})", lhs.format(), rhs.format()),
+                Opcode::Or => format!("({} || {})", lhs.format(), rhs.format()),
+                Opcode::Eq => format!("({} == {})", lhs.format(), rhs.format()),
             },
             Expr::Variable { value, .. } => value.to_string(),
             Expr::IfThenElse {
@@ -272,6 +278,36 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
                     Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Pow => match (lhs_ty, rhs_ty)
                     {
                         (Ty::Field, Ty::Field) => Ok(Ty::Field),
+                        (Ty::Field, _) => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Field,
+                            rhs.source_loc(),
+                            rhs_ty,
+                        ))),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Field,
+                            lhs.source_loc(),
+                            lhs_ty,
+                        ))),
+                    },
+                    Opcode::And | Opcode::Or => match (lhs_ty, rhs_ty) {
+                        (Ty::Boolean, Ty::Boolean) => Ok(Ty::Boolean),
+                        (Ty::Boolean, _) => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Boolean,
+                            rhs.source_loc(),
+                            rhs_ty,
+                        ))),
+                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                            ann.source_loc(),
+                            Ty::Boolean,
+                            lhs.source_loc(),
+                            lhs_ty,
+                        ))),
+                    },
+                    Opcode::Eq => match (lhs_ty, rhs_ty) {
+                        (Ty::Field, Ty::Field) => Ok(Ty::Boolean),
                         (Ty::Field, _) => Err(anyhow!(TypeError::TypeMismatch(
                             ann.source_loc(),
                             Ty::Field,

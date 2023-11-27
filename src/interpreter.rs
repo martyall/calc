@@ -93,6 +93,18 @@ impl Value {
             _ => unreachable!("Only Fields can be raised to a power"),
         }
     }
+    fn and(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Boolean(lhs), Value::Boolean(rhs)) => Value::Boolean(lhs && rhs),
+            _ => unreachable!("Only Booleans can be and-ed"),
+        }
+    }
+    fn or(self, rhs: Self) -> Self {
+        match (self, rhs) {
+            (Value::Boolean(lhs), Value::Boolean(rhs)) => Value::Boolean(lhs || rhs),
+            _ => unreachable!("Only Booleans can be or-ed"),
+        }
+    }
 }
 
 pub fn interpret<A: Clone + HasSourceLoc>(
@@ -122,6 +134,9 @@ pub fn interpret<A: Clone + HasSourceLoc>(
                 Opcode::Sub => Ok(lhs - rhs),
                 Opcode::Mul => Ok(lhs * rhs),
                 Opcode::Pow => Ok(lhs.pow(rhs)),
+                Opcode::And => Ok(lhs.and(rhs)),
+                Opcode::Or => Ok(lhs.or(rhs)),
+                Opcode::Eq => Ok(Value::Boolean(lhs == rhs)),
             }
         }
         Expr::Variable { value, ann } => match context.get(value) {

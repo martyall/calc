@@ -40,6 +40,17 @@ fn interpret_as_target<A>(
                 Opcode::Sub => builder.sub(lhs, rhs),
                 Opcode::Mul => builder.mul(lhs, rhs),
                 Opcode::Pow => builder.exp(lhs, rhs, 10),
+                Opcode::And => {
+                    builder
+                        .and(BoolTarget::new_unsafe(lhs), BoolTarget::new_unsafe(rhs))
+                        .target
+                }
+                Opcode::Or => {
+                    builder
+                        .or(BoolTarget::new_unsafe(lhs), BoolTarget::new_unsafe(rhs))
+                        .target
+                }
+                Opcode::Eq => builder.is_equal(lhs, rhs).target,
             }
         }
         Expr::IfThenElse {

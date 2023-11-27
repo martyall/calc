@@ -1,4 +1,5 @@
-use crate::ast::{annotation::HasSourceLoc, typechecker::TypeError};
+use crate::ast::annotation::HasSourceLoc;
+use crate::ast::error::ASTError;
 use anyhow::{anyhow, Result};
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
@@ -252,7 +253,7 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
             },
             Expr::Variable { ann, value } => match context.context.get(&value) {
                 Some(ty) => Ok(ty.clone()),
-                None => Err(anyhow!(TypeError::UndefinedVariable(
+                None => Err(anyhow!(ASTError::UnboundIdentifier(
                     ann.source_loc(),
                     value.clone()
                 ))),
@@ -262,7 +263,7 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
                 match op {
                     UOpcode::Neg => match expr_ty {
                         Ty::Field => Ok(Ty::Field),
-                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                        _ => Err(anyhow!(ASTError::TypeMismatch(
                             ann.source_loc(),
                             Ty::Field,
                             expr.source_loc(),
@@ -278,13 +279,13 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
                     Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Pow => match (lhs_ty, rhs_ty)
                     {
                         (Ty::Field, Ty::Field) => Ok(Ty::Field),
-                        (Ty::Field, _) => Err(anyhow!(TypeError::TypeMismatch(
+                        (Ty::Field, _) => Err(anyhow!(ASTError::TypeMismatch(
                             ann.source_loc(),
                             Ty::Field,
                             rhs.source_loc(),
                             rhs_ty,
                         ))),
-                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                        _ => Err(anyhow!(ASTError::TypeMismatch(
                             ann.source_loc(),
                             Ty::Field,
                             lhs.source_loc(),
@@ -293,13 +294,13 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
                     },
                     Opcode::And | Opcode::Or => match (lhs_ty, rhs_ty) {
                         (Ty::Boolean, Ty::Boolean) => Ok(Ty::Boolean),
-                        (Ty::Boolean, _) => Err(anyhow!(TypeError::TypeMismatch(
+                        (Ty::Boolean, _) => Err(anyhow!(ASTError::TypeMismatch(
                             ann.source_loc(),
                             Ty::Boolean,
                             rhs.source_loc(),
                             rhs_ty,
                         ))),
-                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                        _ => Err(anyhow!(ASTError::TypeMismatch(
                             ann.source_loc(),
                             Ty::Boolean,
                             lhs.source_loc(),
@@ -308,13 +309,13 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
                     },
                     Opcode::Eq => match (lhs_ty, rhs_ty) {
                         (Ty::Field, Ty::Field) => Ok(Ty::Boolean),
-                        (Ty::Field, _) => Err(anyhow!(TypeError::TypeMismatch(
+                        (Ty::Field, _) => Err(anyhow!(ASTError::TypeMismatch(
                             ann.source_loc(),
                             Ty::Field,
                             rhs.source_loc(),
                             rhs_ty,
                         ))),
-                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                        _ => Err(anyhow!(ASTError::TypeMismatch(
                             ann.source_loc(),
                             Ty::Field,
                             lhs.source_loc(),
@@ -335,14 +336,14 @@ impl<A: Clone + HasSourceLoc> Expr<A> {
                 match cond_ty {
                     Ty::Boolean => match (_then_ty, _else_ty) {
                         (Ty::Field, Ty::Field) => Ok(Ty::Field),
-                        _ => Err(anyhow!(TypeError::TypeMismatch(
+                        _ => Err(anyhow!(ASTError::TypeMismatch(
                             ann.source_loc(),
                             Ty::Field,
                             _then.clone().source_loc(),
                             _then_ty,
                         ))),
                     },
-                    _ => Err(anyhow!(TypeError::TypeMismatch(
+                    _ => Err(anyhow!(ASTError::TypeMismatch(
                         ann.source_loc(),
                         Ty::Boolean,
                         cond.source_loc(),

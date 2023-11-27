@@ -30,7 +30,7 @@ pub fn compile<A: Clone + HasSourceLoc + Eq + Hash>(
         .collect();
     let expr = optimize(inline(program));
     assert_normal_form(public_vars.clone(), &expr)?;
-    let public_vars = public_vars.into_iter().map(|x| x.var).collect();
+    let public_vars = public_vars.into_iter().map(|x| x.var().clone()).collect();
     Ok(CompiledProgram { public_vars, expr })
 }
 
@@ -41,7 +41,7 @@ fn assert_normal_form<A: Clone + HasSourceLoc>(
 ) -> Result<()> {
     let public_vars = public_vars
         .into_iter()
-        .map(|x| x.var)
+        .map(|x| x.var().clone())
         .collect::<HashSet<Ident>>();
     let unconstrained_vars: Vec<(Ident, A)> = expr
         .variables()

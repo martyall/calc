@@ -3,7 +3,7 @@ use derive_more::Display;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, PartialEq, Clone, Display, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Display, Copy, Serialize, Deserialize, Eq)]
 pub enum Ty {
     Field,
     Boolean,

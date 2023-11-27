@@ -61,13 +61,13 @@ impl<A: Clone + HasSourceLoc + PartialEq> Program<A> {
         let mut decls_ident_set: HashSet<Ident> = HashSet::new();
         for decl in decls.clone() {
             let binder = decl.binder();
-            if decls_ident_set.contains(&binder.var) {
+            if decls_ident_set.contains(&binder.var()) {
                 return Err(anyhow!(ASTError::DuplicateIdentifier(
-                    binder.ann.source_loc(),
-                    binder.var.clone()
+                    binder.ann().source_loc(),
+                    binder.var().clone()
                 )));
             }
-            decls_ident_set.insert(binder.var.clone());
+            decls_ident_set.insert(binder.var().clone());
         }
         // sort the declarations so that all the dependencies of a declaration appear
         // before it in the list (i.e. topologically sorted).
@@ -82,7 +82,7 @@ impl<A: Clone + HasSourceLoc + PartialEq> Program<A> {
                     return Err(anyhow!(ASTError::UnboundIdentifier(ann.source_loc(), var)));
                 }
             }
-            decl_ident_set.insert(decl.binder().var.clone());
+            decl_ident_set.insert(decl.binder().var().clone());
         }
 
         // check that the final expression only uses variables bound in the declarations
@@ -108,15 +108,15 @@ fn dependency_graph<A: Clone + PartialEq + HasSourceLoc>(
     let mut ix_map = HashMap::new();
     for decl in decls {
         let binder = decl.binder();
-        let ix = graph.add_node((binder.var.clone(), binder.ann.clone()));
-        ix_map.insert(binder.var.clone(), ix);
+        let ix = graph.add_node((binder.var().clone(), binder.ann().clone()));
+        ix_map.insert(binder.var().clone(), ix);
     }
     for decl in decls {
         let binder = decl.binder();
         for dep in decl.get_dependencies() {
             match ix_map.get(&dep.0) {
                 Some(ix) => {
-                    graph.add_edge(ix.clone(), ix_map[&binder.var], ());
+                    graph.add_edge(ix.clone(), ix_map[&binder.var()], ());
                 }
                 None => {
                     return Err(anyhow!(ASTError::UnboundIdentifier(
@@ -138,18 +138,17 @@ pub fn find_declaration<A: Clone>(
     for decl in decls {
         match decl {
             Declaration::VarAssignment { binder, expr } => {
-                if binder.var == ident {
+                if binder.var() == &ident {
                     return Some(Declaration::VarAssignment {
                         binder: binder.clone(),
                         expr: expr.clone(),
                     });
                 }
             }
-            Declaration::PublicVar { binder, _type } => {
-                if binder.var == ident {
+            Declaration::PublicVar { binder } => {
+                if binder.var() == &ident {
                     return Some(Declaration::PublicVar {
                         binder: binder.clone(),
-                        _type: _type.clone(),
                     });
                 }
             }
@@ -207,11 +206,11 @@ mod ast_test {
         let ident = Ident::new("x");
         let decls: Vec<Declaration<()>> = vec![
             Declaration::VarAssignment {
-                binder: Binder::default(ident.clone()),
+                binder: Binder::default(ident.clone(), None),
                 expr: Expr::field_default(1),
             },
             Declaration::VarAssignment {
-                binder: Binder::default(ident.clone()),
+                binder: Binder::default(ident.clone(), None),
                 expr: Expr::field_default(2),
             },
         ];
@@ -228,31 +227,29 @@ mod ast_test {
     fn sort_decl_test() {
         let decls: Vec<Declaration<()>> = vec![
             Declaration::PublicVar {
-                binder: Binder::default(Ident::new("p")),
-                _type: Ty::Field,
+                binder: Binder::default(Ident::new("p"), Some(Ty::Field)),
             },
             Declaration::PublicVar {
-                binder: Binder::default(Ident::new("q")),
-                _type: Ty::Field,
+                binder: Binder::default(Ident::new("q"), Some(Ty::Field)),
             },
             Declaration::VarAssignment {
-                binder: Binder::default(Ident::new("x")),
+                binder: Binder::default(Ident::new("x"), None),
                 expr: Expr::variable_default(Ident::new("y")),
             },
             Declaration::VarAssignment {
-                binder: Binder::default(Ident::new("y")),
+                binder: Binder::default(Ident::new("y"), None),
                 expr: Expr::variable_default(Ident::new("z")),
             },
             Declaration::VarAssignment {
-                binder: Binder::default(Ident::new("z")),
+                binder: Binder::default(Ident::new("z"), None),
                 expr: Expr::variable_default(Ident::new("a")),
             },
             Declaration::VarAssignment {
-                binder: Binder::default(Ident::new("a")),
+                binder: Binder::default(Ident::new("a"), None),
                 expr: Expr::variable_default(Ident::new("b")),
             },
             Declaration::VarAssignment {
-                binder: Binder::default(Ident::new("b")),
+                binder: Binder::default(Ident::new("b"), None),
                 expr: Expr::field_default(1),
             },
         ];
@@ -261,31 +258,29 @@ mod ast_test {
             sorted,
             vec![
                 Declaration::PublicVar {
-                    binder: Binder::default(Ident::new("p")),
-                    _type: Ty::Field,
+                    binder: Binder::default(Ident::new("p"), Some(Ty::Field)),
                 },
                 Declaration::PublicVar {
-                    binder: Binder::default(Ident::new("q")),
-                    _type: Ty::Field,
+                    binder: Binder::default(Ident::new("q"), Some(Ty::Field)),
                 },
                 Declaration::VarAssignment {
-                    binder: Binder::default(Ident::new("b")),
+                    binder: Binder::default(Ident::new("b"), None),
                     expr: Expr::field_default(1),
                 },
                 Declaration::VarAssignment {
-                    binder: Binder::default(Ident::new("a")),
+                    binder: Binder::default(Ident::new("a"), None),
                     expr: Expr::variable_default(Ident::new("b")),
                 },
                 Declaration::VarAssignment {
-                    binder: Binder::default(Ident::new("z")),
+                    binder: Binder::default(Ident::new("z"), None),
                     expr: Expr::variable_default(Ident::new("a")),
                 },
                 Declaration::VarAssignment {
-                    binder: Binder::default(Ident::new("y")),
+                    binder: Binder::default(Ident::new("y"), None),
                     expr: Expr::variable_default(Ident::new("z")),
                 },
                 Declaration::VarAssignment {
-                    binder: Binder::default(Ident::new("x")),
+                    binder: Binder::default(Ident::new("x"), None),
                     expr: Expr::variable_default(Ident::new("y")),
                 },
             ]

@@ -235,8 +235,8 @@ mod parser_tests {
     #[test]
     fn program_test() {
         let input = r#"
-            pub x: field;
-            pub y: bool;
+            pub x: F;
+            pub y: Bool;
             let a = 22 * (x - b);
             let b = 1 - y;
             a * b - 2

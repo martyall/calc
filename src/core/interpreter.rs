@@ -1,177 +1,88 @@
-use crate::ast::{Ident, Literal, Opcode, UOpcode};
-use crate::core::expression::Expr;
-use anyhow::Result;
-use core::ops::{Add, Mul, Neg, Sub};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use crate::ast::Literal;
+use crate::core::expression::LambdaExpr;
+use std::{collections::HashMap, rc::Rc};
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Context {
-    pub context: HashMap<Ident, Expr>,
-}
-
-impl Context {
-    pub fn new() -> Self {
-        Context {
-            context: HashMap::new(),
-        }
-    }
-
-    pub fn get(&self, name: &Ident) -> Option<Expr> {
-        self.context.get(name).cloned()
-    }
-}
-
-impl From<HashMap<Ident, Literal>> for Context {
-    fn from(initial_context: HashMap<Ident, Literal>) -> Self {
-        let context = initial_context
-            .iter()
-            .map(|(k, v)| (k.clone(), Expr::Literal { value: v.clone() }))
-            .collect();
-        Context { context }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub enum Value {
-    Field(i32),
-    Boolean(bool),
-}
-
-impl Neg for Value {
-    type Output = Self;
-    fn neg(self) -> Self {
-        match self {
-            Value::Field(n) => Value::Field(-n),
-            _ => unreachable!("Only Fields can be negated"),
-        }
-    }
-}
-
-impl Add for Value {
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Field(lhs), Value::Field(rhs)) => Value::Field(lhs + rhs),
-            _ => unreachable!("Only Fields can be added"),
-        }
-    }
-}
-
-impl Sub for Value {
-    type Output = Self;
-    fn sub(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Field(lhs), Value::Field(rhs)) => Value::Field(lhs - rhs),
-            _ => unreachable!("Only Fields can be subtracted"),
-        }
-    }
-}
-
-impl Mul for Value {
-    type Output = Self;
-    fn mul(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Field(lhs), Value::Field(rhs)) => Value::Field(lhs * rhs),
-            _ => unreachable!("Only Fields can be multiplied"),
-        }
-    }
-}
-
-impl Value {
-    pub fn pow(self, rhs: Value) -> Self {
-        match (self, rhs) {
-            (Value::Field(n), Value::Field(m)) => Value::Field(n.pow(m as u32)),
-            _ => unreachable!("Only Fields can be raised to a power"),
-        }
-    }
-    fn and(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Boolean(lhs), Value::Boolean(rhs)) => Value::Boolean(lhs && rhs),
-            _ => unreachable!("Only Booleans can be and-ed"),
-        }
-    }
-    fn or(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Value::Boolean(lhs), Value::Boolean(rhs)) => Value::Boolean(lhs || rhs),
-            _ => unreachable!("Only Booleans can be or-ed"),
-        }
-    }
-}
-
-pub fn interpret(context: &mut Context, expr: &Expr) -> Result<Value> {
-    match expr {
-        Expr::Literal {
-            value: Literal::Field(n),
-            ..
-        } => Ok(Value::Field(*n)),
-        Expr::Literal {
-            value: Literal::Boolean(b),
-            ..
-        } => Ok(Value::Boolean(*b)),
-        Expr::UnaryOp { op, expr, .. } => {
-            let expr = interpret(context, expr)?;
-            match op {
-                UOpcode::Neg => Ok(-expr),
+pub fn evaluate(env: &HashMap<String, Rc<LambdaExpr>>, expr: Rc<LambdaExpr>) -> Rc<LambdaExpr> {
+    match &*expr {
+        LambdaExpr::Var(x) => {
+            // Look up the variable in the environment.
+            if let Some(expr) = env.get(x) {
+                // If it's found, return the expression.
+                Rc::clone(expr)
+            } else {
+                // If it's not found, return as is or handle as an error.
+                Rc::clone(&expr)
             }
         }
-        Expr::BinOp { lhs, op, rhs, .. } => {
-            let lhs = interpret(context, lhs)?;
-            let rhs = interpret(context, rhs)?;
-            match op {
-                Opcode::Add => Ok(lhs + rhs),
-                Opcode::Sub => Ok(lhs - rhs),
-                Opcode::Mul => Ok(lhs * rhs),
-                Opcode::Pow => Ok(lhs.pow(rhs)),
-                Opcode::And => Ok(lhs.and(rhs)),
-                Opcode::Or => Ok(lhs.or(rhs)),
-                Opcode::Eq => Ok(Value::Boolean(lhs == rhs)),
+        LambdaExpr::Literal(_) => {
+            // Literals are returned as is.
+            Rc::clone(&expr)
+        }
+        LambdaExpr::Abs(_) => {
+            // Abstractions cannot be evaluated further without an application.
+            Rc::clone(&expr)
+        }
+        LambdaExpr::App(fun, arg) => {
+            match &**fun {
+                LambdaExpr::Abs(f) => {
+                    // Apply the function to the argument.
+                    evaluate(env, f(Rc::clone(arg)))
+                }
+                _ => {
+                    // If it's not an abstraction, return as is or handle as an error.
+                    evaluate(
+                        env,
+                        Rc::new(LambdaExpr::App(
+                            evaluate(env, Rc::clone(fun)),
+                            evaluate(env, Rc::clone(arg)),
+                        )),
+                    )
+                }
             }
         }
-        Expr::Variable { value, .. } => match context.get(value) {
-            Some(expr) => interpret(context, &expr),
-            None => panic!("Unbound variable in interpreter: {}", value),
-        },
-        Expr::IfThenElse {
-            cond, _then, _else, ..
-        } => {
-            let cond = interpret(context, cond)?;
-            match cond {
-                Value::Boolean(true) => interpret(context, _then),
-                Value::Boolean(false) => interpret(context, _else),
-                _ => unreachable!("Only booleans can be used as conditions"),
+        LambdaExpr::IfThenElse(cond, _then, _else) => {
+            match &**cond {
+                LambdaExpr::Literal(Literal::Boolean(b)) => {
+                    if *b {
+                        evaluate(env, Rc::clone(_then))
+                    } else {
+                        evaluate(env, Rc::clone(_else))
+                    }
+                }
+                _ => {
+                    // If condition is not a boolean literal, return as is or handle as an error.
+                    evaluate(
+                        env,
+                        Rc::new(LambdaExpr::IfThenElse(
+                            evaluate(env, Rc::clone(cond)),
+                            Rc::clone(_then),
+                            Rc::clone(_else),
+                        )),
+                    )
+                }
             }
-        }
-        _ => unreachable!("Only literals and variables can be interpreted"),
+        } // ... other variants
     }
 }
 
 #[cfg(test)]
-mod core_interpreter_tests {
+mod test_hoas_encoding {
     use super::*;
-    use crate::{core::expression::from_ast, parser};
+    use crate::ast::{
+        self,
+        expression::{Expr, Opcode},
+    };
+    use crate::core::expression::ast_expr_to_lambda_expr;
+    use crate::core::prim::prim;
 
     #[test]
-    fn no_parens_test() {
-        let input = "22 * 44 + 66";
-        let expr = from_ast(parser::parse_single_expression(input).unwrap());
-        let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Field(1034));
-    }
-
-    #[test]
-    fn parens_test() {
-        let input = "22 * (44 + 66)";
-        let expr = from_ast(parser::parse_single_expression(input).unwrap());
-        let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Field(2420));
-    }
-
-    #[test]
-    fn pow_test() {
-        let input = "2^4 + 1";
-        let expr = from_ast(parser::parse_single_expression(input).unwrap());
-        let mut context = Context::new();
-        assert_eq!(interpret(&mut context, &expr).unwrap(), Value::Field(17));
+    fn test_evaluate() {
+        let prelude = prim();
+        let expr: ast::expression::Expr<()> =
+            Expr::binary_op_default(Expr::field_default(1), Opcode::Add, Expr::field_default(2));
+        println!("expr: {:?}", expr);
+        let expr = ast_expr_to_lambda_expr(expr);
+        let expr = evaluate(&prelude, Rc::new(expr));
+        assert_eq!(expr.as_literal(), Some(Literal::Field(3)));
     }
 }

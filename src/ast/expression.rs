@@ -7,7 +7,7 @@ use std::fmt::Display;
 
 use super::typechecker::{Ty, TypeContext};
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone, Display)]
 pub enum Opcode {
     Add,
     Sub,
@@ -18,7 +18,7 @@ pub enum Opcode {
     Eq,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy, Display)]
 pub enum UOpcode {
     Neg,
 }
